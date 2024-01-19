@@ -101,7 +101,7 @@ class Loc_CQR():
 		inv_eps = 1/self.eps
 		inv_sigma = inv_eps*np.eye(k)
 		
-		vol = 1#np.abs((-2 +1.5)*(-4+3.5)*(0.5-1))
+		vol = 2**k
 		den = np.sqrt((2*np.pi*self.eps)**k)
 
 		const = vol/den
@@ -111,29 +111,36 @@ class Loc_CQR():
 		
 		return ratio[0]
 
-	def weight_calibr_scores(self, x_star):
+	def get_weighted_quantile(self, cal_weights):
+
+		hval, hbin = np.histogram(self.calibr_scores, bins=100*self.q, weights=cal_weights)
+
+		cs = np.cumsum(hval)
+		rhbin = hbin[1:]
+		taus = rhbin[(cs>self.Q)]
+		return taus[0]
+
+	def get_calibr_weights(self, x_star):
 		n = len(self.Xc)
 
-		wncs = np.empty(self.q)
+		r = np.empty(n)
+		for ii in range(n):
+			
+			r[ii] = self.compute_likelihood(x_star, self.Xc[ii])
 
-		c = 0
-		for i in range(n):
-			r_i = self.compute_likelihood(x_star, self.Xc[i])
-			for j in range(self.cal_hist_size):
-				wncs[c] = self.calibr_scores[c]*r_i
-				c += 1
-
-		return np.sort(wncs)[::-1] # descending order
-
-
+		r_rep = np.repeat(r, self.cal_hist_size)
+		weights = r_rep/np.sum(r_rep)
+		
+		return weights
 
 	def get_scores_threshold(self,x_star):
 		'''
 		This method extract the threshold value tau (the quantile at level epsilon) from the 
 		calibration nonconformity scores (computed by the 'self.get_calibr_nonconformity_scores' method)
 		'''
-		weight_cal_scores = self.weight_calibr_scores(x_star)
-		tau_star = np.quantile(weight_cal_scores, self.Q)
+
+		cal_weights = self.get_calibr_weights(x_star)
+		tau_star = self.get_weighted_quantile(cal_weights)	
 		
 		if False:
 			fig = plt.figure()
