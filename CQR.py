@@ -147,11 +147,11 @@ class CQR():
 			coverages[i] = c/self.test_hist_size
 
 		avg_cov = np.mean(coverages)
-		ym = 15
+
 		fig = plt.figure()
 		plt.hist(coverages, bins = 50, stacked=False, density=True, color='lightsteelblue')
-		plt.vlines(x=target_cov, ymin=0,ymax=ym,colors='k', linestyles='dashed', label=r'$1-\alpha$')
-		plt.vlines(x=avg_cov, ymin=0,ymax=ym,colors='steelblue', linestyles='dashed', label='mean')
+		plt.axvline(x=target_cov, color='k', linestyle='dashed', label=r'$1-\alpha$')
+		plt.axvline(x=avg_cov, color='steelblue', linestyle='dashed', label='mean')
 		
 		plt.xlabel('coverage')
 		plt.title('marginal cpi')
@@ -195,16 +195,16 @@ class CQR():
 			else:
 				neg_coverages[i] = c_neg/tot_neg
 
-		ym = 15
+
 		avg_pos_cov = np.mean(pos_coverages)
 		avg_neg_cov = np.mean(neg_coverages)
 		fig = plt.figure()
 		plt.hist(pos_coverages, bins = 50, stacked=False, density=True, color='cornflowerblue', label='pos')
 		plt.hist(neg_coverages, bins = 50, stacked=False, density=True, color='lightcoral', label='neg')
 		
-		plt.vlines(x=target_cov, ymin=0,ymax=ym,colors='k', linestyles='dashed', label=r'$1-\alpha$')
-		plt.vlines(x=avg_pos_cov, ymin=0,ymax=ym,colors='mediumblue', linestyles='dashed', label='pos mean')
-		plt.vlines(x=avg_neg_cov, ymin=0,ymax=ym,colors='firebrick', linestyles='dashed', label='neg mean')
+		plt.axvline(x=target_cov, color='k', linestyle='dashed', label=r'$1-\alpha$')
+		plt.axvline(x=avg_pos_cov, color='mediumblue', linestyle='dashed', label='pos mean')
+		plt.axvline(x=avg_neg_cov, color='firebrick', linestyle='dashed', label='neg mean')
 		
 		plt.xlabel('cc coverage')
 		plt.title('marginal cpi')
