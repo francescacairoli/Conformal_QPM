@@ -1,6 +1,9 @@
 # Conformal_QPM
 Conformal inference for quantitative predictive monitoring of stochastic processes
 
+**Download** the pre-generated synthetic datasets and pre-trained models from this repository: https://drive.google.com/drive/folders/1YeZuVuub3nDsFVYGbVPNUixIrNY5fx3T?usp=share_link
+The link contains a compressed file `load.zip`. Unzip the file obtaining `Datasets/` folder containing the pre-generated datasets and the `Models/` folder containing the pre-trained models. 
+
 ## Setting up the working environment
 
 Create a working virtual environment
