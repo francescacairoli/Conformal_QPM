@@ -223,7 +223,7 @@ class Loc_CQR():
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
-		fig.savefig(plot_path+"/loc_marginal_coverage_distribution.png")
+		fig.savefig(plot_path+f"/loc_marginal_coverage_distribution_eps={self.eps}.png")
 		plt.close()
 	
 		return coverages
@@ -276,7 +276,7 @@ class Loc_CQR():
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
-		fig.savefig(plot_path+"/loc_cc_coverage_distribution.png")
+		fig.savefig(plot_path+f"/loc_cc_coverage_distribution_eps={self.eps}.png")
 		plt.close()
 
 	def get_coverage_efficiency_coupled(self, y_test, test_pred_interval1, test_pred_interval2):

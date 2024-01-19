@@ -45,7 +45,7 @@ n_train_states, n_cal_states, n_test_states, cal_hist_size, test_hist_size = ds_
 quantiles = np.array([args.alpha/2, 0.5,  1-args.alpha/2]) # LB, MEDIAN, UB
 nb_quantiles = len(quantiles)
 
-idx_str = f'QPM_#{args.property_idx}_eps{args.eps}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
+idx_str = f'QPM_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
 
 
 print(f"Models folder = Models/{model_name}/ID_{idx_str}")
@@ -148,5 +148,5 @@ results_list = ["Id = ", idx_str, "\n", "\n epsilon=", str(args.eps), "\n Quanti
 "\n loc_cpi_correct = ", str(loc_cpi_correct), "\n loc_cpi_uncertain = ", str(loc_cpi_uncertain), "\n loc_cpi_wrong = ", str(loc_cpi_wrong),"\n loc_cpi_fp = ", str(loc_cpi_fp),"\n loc_cpi_coverage = ", str(loc_cpi_coverage), "\n loc_cpi_efficiency = ", str(loc_cpi_efficiency)
 ]
 
-save_results_to_file(results_list, qr.results_path)
+save_results_to_file(results_list, qr.results_path, extra_info=f'_eps={args.eps}')
 print(qr.results_path)
