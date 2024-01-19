@@ -4,12 +4,14 @@ Conformal inference for quantitative predictive monitoring of stochastic process
 ## Setting up the working environment
 
 Create a working virtual environment
-    - create a virtual environment
-    pip install virtualenv
+- create a virtual environment
+
+  pip install virtualenv
     python3 -m venv qpm_env
     source qpm_env/bin/activate
     
-    - install the specified requirements
+- install the specified requirements
+  
     pip install -r requirements.txt
     
 
