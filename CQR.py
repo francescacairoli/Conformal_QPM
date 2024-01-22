@@ -340,17 +340,17 @@ class CQR():
 		qr_dplus = qr_interval[:n_points_to_plot,-1]-qr_med
 		plt.errorbar(x=xline1, y=qr_med, yerr=[qr_dminus,qr_dplus],  color = 'c', fmt='o', capsize = 4, label='QR')
 		
-		cqr_med = cqr_interval[:n_points_to_plot,1]
+		cqr_med = (cqr_interval[:n_points_to_plot,0]+cqr_interval[:n_points_to_plot,-1])/2
 		cqr_dminus = cqr_med-cqr_interval[:n_points_to_plot,0]
 		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-cqr_med
-		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'darkviolet', fmt='o', capsize = 4,label='CQR')
+		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'darkviolet', fmt='none', capsize = 4,label='CQR')
 		
 		plt.ylabel('robustness')
 		plt.title(title_string)
 		plt.legend()
 		plt.grid(True)
 		plt.tight_layout()
-		fig.savefig(plot_path+"/"+extra_info+"_errorbar_merged.png")
+		fig.savefig(plot_path+"/"+extra_info+"_errorbar.png")
 		plt.close()
 
 	def plot_comb_errorbars(self, y, cqr_interval, title_string, plot_path, extra_info = ''):
@@ -402,5 +402,5 @@ class CQR():
 		plt.legend()
 		plt.grid(True)
 		plt.tight_layout()
-		fig.savefig(plot_path+"/"+extra_info+"_errorbar_merged.png")
+		fig.savefig(plot_path+"/"+extra_info+"_errorbar.png")
 		plt.close()

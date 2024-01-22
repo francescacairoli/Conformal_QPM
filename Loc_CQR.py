@@ -24,12 +24,14 @@ class Loc_CQR():
 		- comb_flag = False: performs normal CQR over a single property 
 		- comb_flag = True: combine the prediction intervals of the CQR of two properties
 	'''
-	def __init__(self, Xc, Yc, trained_qr_model, eps= 0.1, test_hist_size = 200, cal_hist_size = 50, quantiles = [0.05, 0.95], comb_flag = False,plots_path=''):
+	def __init__(self, Xc, Yc, trained_qr_model, type_local = 'gauss', eps= 0.1, knn = 100, test_hist_size = 200, cal_hist_size = 50, quantiles = [0.05, 0.95], comb_flag = False,plots_path=''):
 		super(Loc_CQR, self).__init__()
 
 		self.Yc = Yc
 		self.Xc = Xc
-		self.eps = eps
+		self.type_local = type_local # {'gauss', 'knn'}
+		self.eps = eps # variance of the gaussian localizers
+		self.knn = knn # nb of neighbors in the knn localizer
 		self.trained_qr_model = trained_qr_model
 		self.q = len(Yc) # number of points in the calibration set
 		self.test_hist_size = test_hist_size
@@ -94,7 +96,7 @@ class Loc_CQR():
 		# nonconformity scores on the calibration set
 		self.calibr_scores = self.get_calibr_nonconformity_scores(self.Yc, self.calibr_pred, sorting=False)
 	
-	def compute_likelihood(self, x_star, xi):
+	def compute_gauss_likelihood(self, x_star, xi):
 
 		
 		k = len(x_star)
@@ -107,8 +109,8 @@ class Loc_CQR():
 		const = vol/den
 		diff = xi-x_star
 		
-		ratio = const*np.exp(-np.dot(diff.reshape(1,k),np.dot(inv_sigma,diff))/2)
-		
+		ratio = (const*np.exp(-np.dot(diff.reshape(1,k),np.dot(inv_sigma,diff))/2))
+
 		return ratio[0]
 
 	def get_weighted_quantile(self, cal_weights):
@@ -122,15 +124,27 @@ class Loc_CQR():
 
 	def get_calibr_weights(self, x_star):
 		n = len(self.Xc)
+		m = n*self.cal_hist_size
+		if self.type_local == 'gauss':
+			r = np.empty(n)
+			for ii in range(n):
+				
+				r[ii] = self.compute_gauss_likelihood(x_star, self.Xc[ii])
 
-		r = np.empty(n)
-		for ii in range(n):
-			
-			r[ii] = self.compute_likelihood(x_star, self.Xc[ii])
+			r_rep = np.repeat(r, self.cal_hist_size)
+			weights = r_rep/np.sum(r_rep)
+		elif self.type_local == 'knn':
+			diff = x_star-self.Xc
+			dists = np.array([np.linalg.norm(diff[i]) for i in range(n)])
+			sort_index = np.argsort(dists) # increasing sorting
+			r = np.zeros(n)
+			r[sort_index[:self.knn]] = 1
+			r_rep = np.repeat(r, self.cal_hist_size)
+			weights = r_rep/(self.knn*self.cal_hist_size)
+		else:
+			print(' Warning: unrecongnized localization type')
+			weights = np.ones(m)/m
 
-		r_rep = np.repeat(r, self.cal_hist_size)
-		weights = r_rep/np.sum(r_rep)
-		
 		return weights
 
 	def get_scores_threshold(self,x_star):
@@ -226,11 +240,14 @@ class Loc_CQR():
 		plt.axvline(x=avg_cov, color='steelblue', linestyle='dashed', label='mean')
 		
 		plt.xlabel('coverage')
-		plt.title('loc cpi')
+		plt.title(self.type_local+' loc cpi')
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
-		fig.savefig(plot_path+f"/loc_marginal_coverage_distribution_eps={self.eps}.png")
+		if self.type_local == 'gauss':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_marginal_coverage_distribution_eps={self.eps}.png")
+		elif self.type_local == 'knn':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_marginal_coverage_distribution_k={self.knn}.png")
 		plt.close()
 	
 		return coverages
@@ -278,11 +295,16 @@ class Loc_CQR():
 		plt.axvline(x=avg_neg_cov, color='firebrick', linestyle='dashed', label='neg mean')
 		
 		plt.xlabel('cc coverage')
-		plt.title('loc cpi')
+		plt.title(self.type_local+' loc cpi')
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
-		fig.savefig(plot_path+f"/loc_cc_coverage_distribution_eps={self.eps}.png")
+		if self.type_local == 'gauss':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_eps={self.eps}.png")
+		elif self.type_local == 'knn':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_k={self.knn}.png")
+		else:
+			print('warning: unrecognized localizer type!')
 		plt.close()
 
 	def get_coverage_efficiency_coupled(self, y_test, test_pred_interval1, test_pred_interval2):
@@ -395,6 +417,7 @@ class Loc_CQR():
 
 		n_quant = qr_interval.shape[1]
 
+		leg_lab = {'gauss':'Gauss', 'knn':'kNN'}
 		xline = np.arange(n_points_to_plot)
 		xline1 = np.arange(n_points_to_plot)+0.15
 		xline2 = np.arange(n_points_to_plot)+0.3
@@ -412,21 +435,29 @@ class Loc_CQR():
 		plt.errorbar(x=xline1, y=qr_med, yerr=[qr_dminus,qr_dplus],  color = 'c', fmt='o', capsize = 4, label='QR')
 		
 
-		cqr_dminus = qr_med-cqr_interval[:n_points_to_plot,0]
-		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-qr_med
-		plt.errorbar(x=xline2, y=qr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'blue', fmt='o', capsize = 4,label='CQR')
+		cqr_med = (cqr_interval[:n_points_to_plot,0]+cqr_interval[:n_points_to_plot,-1])/2
+		cqr_dminus = cqr_med-cqr_interval[:n_points_to_plot,0]
+		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-cqr_med
+		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'blue', fmt='none', capsize = 4,label='CQR')
 
-		loc_cqr_dminus = qr_med-loc_cqr_interval[:n_points_to_plot,0]
-		loc_cqr_dplus = loc_cqr_interval[:n_points_to_plot,-1]-qr_med
-		plt.errorbar(x=xline3, y=qr_med, yerr=[loc_cqr_dminus,loc_cqr_dplus],  color = 'darkviolet', fmt='o', capsize = 4,label='Loc-CQR')
+		loc_cqr_med = (loc_cqr_interval[:n_points_to_plot,0]+loc_cqr_interval[:n_points_to_plot,-1])/2
+		loc_cqr_dminus = loc_cqr_med-loc_cqr_interval[:n_points_to_plot,0]
+		loc_cqr_dplus = loc_cqr_interval[:n_points_to_plot,-1]-loc_cqr_med
+		plt.errorbar(x=xline3, y=loc_cqr_med, yerr=[loc_cqr_dminus,loc_cqr_dplus],  color = 'darkviolet', fmt='none', capsize = 4,label=leg_lab[self.type_local]+'-CQR')
 
 		plt.ylabel('robustness')
 		plt.title(title_string)
 		plt.legend()
 		plt.grid(True)
 		plt.tight_layout()
-		fig.savefig(plot_path+"/"+extra_info+f"_errorbar_merged_eps={self.eps}.png")
+		if self.type_local == 'gauss':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_"+extra_info+f"_errorbar_eps={self.eps}.png")
+		elif self.type_local == 'knn':
+			fig.savefig(plot_path+f"/loc_{self.type_local}_"+extra_info+f"_errorbar_k={self.knn}.png")
+		else:
+			print('warning: unrecognized localizer type!')
 		plt.close()
+
 
 	def plot_comb_errorbars(self, y, cqr_interval, title_string, plot_path, extra_info = ''):
 		'''
@@ -477,5 +508,5 @@ class Loc_CQR():
 		plt.legend()
 		plt.grid(True)
 		plt.tight_layout()
-		fig.savefig(plot_path+"/"+extra_info+"_errorbar_merged.png")
+		fig.savefig(plot_path+"/"+extra_info+"_errorbar.png")
 		plt.close()

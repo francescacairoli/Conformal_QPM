@@ -28,7 +28,9 @@ parser.add_argument("--opt", default="Adam", type=str, help="Optimizer")
 parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out rate")
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
 parser.add_argument("--property_idx", default=0, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
+parser.add_argument("--type_localizer", default="gauss", type=str, help="Type of localizer: gauss or knn")
 parser.add_argument("--eps", default=0.1, type=float)
+parser.add_argument("--knn", default=100, type=int)
 args = parser.parse_args()
 print(args)
 
@@ -84,12 +86,12 @@ cqr = CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_
 cpi_test, pi_test = cqr.get_cpi(dataset.X_test, pi_flag = True)
 
 cc_cqr = CC_CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
-_, cc_cpi_test, _ = cc_cqr.get_cpi(dataset.X_test, pi_flag = True)
+_, cc_cpi_test = cc_cqr.get_cpi(dataset.X_test)
 
-loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal,eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 loc_cqr.get_calibr_scores()
 
-_, loc_cpi_test, _ = loc_cqr.get_cpi(dataset.X_test, pi_flag = True)
+_, loc_cpi_test = loc_cqr.get_cpi(dataset.X_test)
 
 _ = cqr.coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
 _ = cqr.cc_coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
