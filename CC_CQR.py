@@ -161,7 +161,37 @@ class CC_CQR():
 		else:
 			return cpi.T, cc_cpi.T
 
-	def coverage_distribution(self, y_test, test_pred_interval, plot_path, target_cov):
+	def get_cc_cpi(self, inputs, pi_flag = False):
+		'''
+		Returns the conformalized prediction interval (cpi) by enlarging the 
+		QR prediction interval by adding an subtracting tau from the lower and upper bound resp.
+		'''
+		pi, pi_plus, pi_minus = self.get_pred_interval(inputs)
+		self.get_scores_thresholds()
+
+		n_quant = pi.shape[1]
+
+		cpi = pi[:,0]-self.tau
+		for j in range(1,n_quant-1):
+			cpi = np.vstack((cpi, pi[:,j]))
+		cpi = np.vstack((cpi, pi[:,-1]+self.tau))
+
+		pos_cpi = pi_plus
+		pos_cpi[:,0] -= self.tau_plus
+		pos_cpi[:,-1] += self.tau_plus
+
+		neg_cpi = pi_minus
+		neg_cpi[:,0] -= self.tau_minus
+		neg_cpi[:,-1] += self.tau_minus
+
+		
+
+		if pi_flag:
+			return cpi.T, pos_cpi, neg_cpi, pi
+		else:
+			return cpi.T, pos_cpi, neg_cpi
+
+	def coverage_distribution(self, y_test, test_pred_interval1, test_pred_interval2, plot_path, target_cov):
 		'''
 		Compute the empirical coverage and the efficiency of a prediction interval (test_pred_interval).
 		y_test are the observed target values
@@ -173,7 +203,7 @@ class CC_CQR():
 		for i in range(n_points):
 			c = 0
 			for j in range(self.test_hist_size):
-				if y_test_hist[i,j] >= test_pred_interval[i,0] and y_test_hist[i, j] <= test_pred_interval[i,-1]:
+				if (y_test_hist[i,j] >= test_pred_interval1[i,0] and y_test_hist[i, j] <= test_pred_interval1[i,-1]) or (y_test_hist[i,j] >= test_pred_interval2[i,0] and y_test_hist[i, j] <= test_pred_interval2[i,-1]):
 					c += 1
 			coverages[i] = c/self.test_hist_size
 
@@ -194,7 +224,9 @@ class CC_CQR():
 	
 		return coverages
 
-	def cc_coverage_distribution(self, y_test, test_pred_interval, plot_path, target_cov):
+
+
+	def cc_coverage_distribution(self, y_test, test_pred_interval1, test_pred_interval2, plot_path, target_cov):
 		'''
 		Compute the empirical coverage and the efficiency of a prediction interval (test_pred_interval).
 		y_test are the observed target values
@@ -210,12 +242,11 @@ class CC_CQR():
 			for j in range(self.test_hist_size):
 				if y_test_hist[i,j] >= 0:
 					tot_pos += 1
+					if y_test_hist[i,j] >= test_pred_interval1[i,0] and y_test_hist[i, j] <= test_pred_interval1[i,-1]:
+						c_pos += 1
 				else:
 					tot_neg += 1
-				if y_test_hist[i,j] >= test_pred_interval[i,0] and y_test_hist[i, j] <= test_pred_interval[i,-1]:
-					if y_test_hist[i,j] >= 0:
-						c_pos += 1
-					else:
+					if y_test_hist[i,j] >= test_pred_interval2[i,0] and y_test_hist[i, j] <= test_pred_interval2[i,-1]:
 						c_neg += 1
 			if tot_pos == 0:
 				pos_coverages[i] = 1
@@ -399,7 +430,7 @@ class CC_CQR():
 		fig.savefig(plot_path+"/"+extra_info+"_errorbar.png")
 		plt.close()
 
-	def plot_cc_errorbars(self, y, qr_interval, cqr_interval, cc_cqr_interval, title_string, plot_path, extra_info = ''):
+	def plot_cc_errorbars(self, y, qr_interval, cqr_interval, pos_cqr_interval, neg_cqr_interval, title_string, plot_path, extra_info = ''):
 		'''
 		Create barplots
 		'''
@@ -430,6 +461,7 @@ class CC_CQR():
 		xline1 = np.arange(n_points_to_plot)+0.15
 		xline2 = np.arange(n_points_to_plot)+0.3
 		xline3 = np.arange(n_points_to_plot)+0.45
+		xline4 = np.arange(n_points_to_plot)+0.5
 				
 		fig = plt.figure(figsize=(20,4))
 		plt.scatter(xline_rep_out, yq_out, c='peachpuff', s=6, alpha = 0.25)
@@ -447,11 +479,17 @@ class CC_CQR():
 		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-cqr_med
 		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'blue', fmt='none', capsize = 4,label='CQR')
 
-		cc_cqr_med = (cc_cqr_interval[:n_points_to_plot,0]+cc_cqr_interval[:n_points_to_plot,-1])/2
-		cc_cqr_dminus = cc_cqr_med-cc_cqr_interval[:n_points_to_plot,0]
-		cc_cqr_dplus = cc_cqr_interval[:n_points_to_plot,-1]-cc_cqr_med
+		pos_cqr_med = (pos_cqr_interval[:n_points_to_plot,0]+pos_cqr_interval[:n_points_to_plot,-1])/2
+		pos_cqr_dminus = pos_cqr_med-pos_cqr_interval[:n_points_to_plot,0]
+		pos_cqr_dplus = pos_cqr_interval[:n_points_to_plot,-1]-pos_cqr_med
 		
-		plt.errorbar(x=xline3, y=cc_cqr_med, yerr=[cc_cqr_dminus,cc_cqr_dplus],  color = 'darkviolet', fmt='none', capsize = 4,label='CC-CQR')
+		plt.errorbar(x=xline3, y=pos_cqr_med, yerr=[pos_cqr_dminus,pos_cqr_dplus],  color = 'cornflowerblue', fmt='none', capsize = 4,label='Pos-CQR')
+		
+		neg_cqr_med = (neg_cqr_interval[:n_points_to_plot,0]+neg_cqr_interval[:n_points_to_plot,-1])/2
+		neg_cqr_dminus = neg_cqr_med-neg_cqr_interval[:n_points_to_plot,0]
+		neg_cqr_dplus = neg_cqr_interval[:n_points_to_plot,-1]-neg_cqr_med
+		
+		plt.errorbar(x=xline4, y=neg_cqr_med, yerr=[neg_cqr_dminus,neg_cqr_dplus],  color = 'lightcoral', fmt='none', capsize = 4,label='Neg-CQR')
 		
 		plt.ylabel('robustness')
 		plt.title(title_string)

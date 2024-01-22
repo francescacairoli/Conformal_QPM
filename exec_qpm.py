@@ -86,7 +86,8 @@ cqr = CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_
 cpi_test, pi_test = cqr.get_cpi(dataset.X_test, pi_flag = True)
 
 cc_cqr = CC_CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
-_, cc_cpi_test = cc_cqr.get_cpi(dataset.X_test)
+#_, cc_cpi_test = cc_cqr.get_cpi(dataset.X_test)
+_, pos_cpi_test, neg_cpi_test = cc_cqr.get_cc_cpi(dataset.X_test)
 
 loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 loc_cqr.get_calibr_scores()
@@ -96,8 +97,8 @@ _, loc_cpi_test = loc_cqr.get_cpi(dataset.X_test)
 _ = cqr.coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
 _ = cqr.cc_coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
 
-_ = cc_cqr.coverage_distribution(dataset.R_test, cc_cpi_test, qr.results_path, 1-args.alpha)
-_ = cc_cqr.cc_coverage_distribution(dataset.R_test, cc_cpi_test, qr.results_path, 1-args.alpha)
+_ = cc_cqr.coverage_distribution(dataset.R_test, pos_cpi_test, neg_cpi_test, qr.results_path, 1-args.alpha)
+_ = cc_cqr.cc_coverage_distribution(dataset.R_test, pos_cpi_test, neg_cpi_test, qr.results_path, 1-args.alpha)
 
 _ = loc_cqr.coverage_distribution(dataset.R_test, loc_cpi_test, qr.results_path, 1-args.alpha)
 _ = loc_cqr.cc_coverage_distribution(dataset.R_test, loc_cpi_test, qr.results_path, 1-args.alpha)
@@ -112,10 +113,10 @@ print("cpi_coverage = ", cpi_coverage, "cpi_efficiency = ", cpi_efficiency)
 cpi_correct, cpi_uncertain, cpi_wrong, cpi_fp = cqr.compute_accuracy_and_uncertainty(cpi_test, dataset.L_test)
 print("cpi_correct = ", cpi_correct, "cpi_uncertain = ", cpi_uncertain, "cpi_wrong = ", cpi_wrong, "cpi_fp = ", cpi_fp)
 
-cc_cpi_coverage, cc_cpi_efficiency = cc_cqr.get_coverage_efficiency(dataset.R_test, cc_cpi_test)
+cc_cpi_coverage, cc_cpi_efficiency = cc_cqr.get_coverage_efficiency_coupled(dataset.R_test, pos_cpi_test, neg_cpi_test)
 print("cc_cpi_coverage = ", cc_cpi_coverage, "cc_cpi_efficiency = ", cc_cpi_efficiency)
-cc_cpi_correct, cc_cpi_uncertain, cc_cpi_wrong, cc_cpi_fp = cc_cqr.compute_accuracy_and_uncertainty(cc_cpi_test, dataset.L_test)
-print("cc_cpi_correct = ", cc_cpi_correct, "cc_cpi_uncertain = ", cc_cpi_uncertain, "cc_cpi_wrong = ", cc_cpi_wrong, "cc_cpi_fp = ", cc_cpi_fp)
+#cc_cpi_correct, cc_cpi_uncertain, cc_cpi_wrong, cc_cpi_fp = cc_cqr.compute_accuracy_and_uncertainty(cc_cpi_test, dataset.L_test)
+#print("cc_cpi_correct = ", cc_cpi_correct, "cc_cpi_uncertain = ", cc_cpi_uncertain, "cc_cpi_wrong = ", cc_cpi_wrong, "cc_cpi_fp = ", cc_cpi_fp)
 
 loc_cpi_coverage, loc_cpi_efficiency = loc_cqr.get_coverage_efficiency(dataset.R_test, loc_cpi_test)
 print("loc_cpi_coverage = ", loc_cpi_coverage, "loc_cpi_efficiency = ", loc_cpi_efficiency)
@@ -123,12 +124,12 @@ loc_cpi_correct, loc_cpi_uncertain, loc_cpi_wrong, loc_cpi_fp = loc_cqr.compute_
 print("loc_cpi_correct = ", loc_cpi_correct, "loc_cpi_uncertain = ", loc_cpi_uncertain, "loc_cpi_wrong = ", loc_cpi_wrong, "loc_cpi_fp = ", loc_cpi_fp)
 
 cqr.plot_errorbars(dataset.R_test, pi_test, cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
-cc_cqr.plot_cc_errorbars(dataset.R_test, pi_test, cpi_test, cc_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
+cc_cqr.plot_cc_errorbars(dataset.R_test, pi_test, cpi_test, pos_cpi_test, neg_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
 loc_cqr.plot_loc_errorbars(dataset.R_test, pi_test, cpi_test, loc_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
 
-d = {model_name:['QR', 'CQR', 'CC_CQR', 'Loc_CQR'],'correct': [pi_correct, cpi_correct, cc_cpi_correct, loc_cpi_correct],
-	'uncertain': [pi_uncertain, cpi_uncertain, cc_cpi_uncertain, loc_cpi_uncertain],
-	'wrong':[pi_wrong, cpi_wrong, cc_cpi_wrong, loc_cpi_wrong], 'FP':[pi_fp, cpi_fp, cc_cpi_fp, loc_cpi_fp],
+d = {model_name:['QR', 'CQR', 'CC_CQR', 'Loc_CQR'],'correct': [pi_correct, cpi_correct, 'x', loc_cpi_correct],
+	'uncertain': [pi_uncertain, cpi_uncertain,  'x', loc_cpi_uncertain],
+	'wrong':[pi_wrong, cpi_wrong,  'x', loc_cpi_wrong], 'FP':[pi_fp, cpi_fp,  'x', loc_cpi_fp],
 	'coverage':[pi_coverage, cpi_coverage, cc_cpi_coverage, loc_cpi_coverage],
 	'efficiency': [pi_efficiency, cpi_efficiency, cc_cpi_efficiency, loc_cpi_efficiency],
 	'EQR width': [eqr_width, '-', '-', '-']}
@@ -145,7 +146,8 @@ results_list = ["Id = ", idx_str, "\n", "\n epsilon=", str(args.eps), "\n Quanti
 "\n",
 "\n cpi_correct = ", str(cpi_correct), "\n cpi_uncertain = ", str(cpi_uncertain), "\n cpi_wrong = ", str(cpi_wrong),"\n cpi_fp = ", str(cpi_fp),"\n cpi_coverage = ", str(cpi_coverage), "\n cpi_efficiency = ", str(cpi_efficiency),
 "\n",
-"\n cc_cpi_correct = ", str(cc_cpi_correct), "\n cc_cpi_uncertain = ", str(cc_cpi_uncertain), "\n cc_cpi_wrong = ", str(cc_cpi_wrong),"\n cc_cpi_fp = ", str(cc_cpi_fp),"\n cc_cpi_coverage = ", str(cc_cpi_coverage), "\n cc_cpi_efficiency = ", str(cc_cpi_efficiency),
+#"\n cc_cpi_correct = ", str(cc_cpi_correct), "\n cc_cpi_uncertain = ", str(cc_cpi_uncertain), "\n cc_cpi_wrong = ", str(cc_cpi_wrong),"\n cc_cpi_fp = ", str(cc_cpi_fp),
+"\n cc_cpi_coverage = ", str(cc_cpi_coverage), "\n cc_cpi_efficiency = ", str(cc_cpi_efficiency),
 "\n",
 "\n loc_cpi_correct = ", str(loc_cpi_correct), "\n loc_cpi_uncertain = ", str(loc_cpi_uncertain), "\n loc_cpi_wrong = ", str(loc_cpi_wrong),"\n loc_cpi_fp = ", str(loc_cpi_fp),"\n loc_cpi_coverage = ", str(loc_cpi_coverage), "\n loc_cpi_efficiency = ", str(loc_cpi_efficiency)
 ]
