@@ -7,6 +7,8 @@ from data_generation.AutomAnaesthesiaDelivery import *
 
 from QR import * # NN architecture to learn quantiles
 from CQR import *
+from CB_CQR import * # CC_CQR older version
+from Loc_CQR import *
 from Dataset import *
 from TrainQR_multiquantile import *
 
@@ -24,10 +26,13 @@ parser.add_argument("--opt", default="Adam", type=str, help="Optimizer")
 parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out rate")
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
 parser.add_argument("--property_idx", default=-1, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
-parser.add_argument("--prop_str", default='G', type=str, help='G for globally property, F for eventually property')
+parser.add_argument("--prop_str", default='F', type=str, help='G for globally property, F for eventually property')
 parser.add_argument("--seed", default=0, type=int, help='set random seed')
+parser.add_argument("--type_localizer", default="knns", type=str, help="Type of localizer: gauss or knn")
+parser.add_argument("--eps", default=0.1, type=float)
+parser.add_argument("--knn", default=10, type=int)
 args = parser.parse_args()
-
+print(args)
 # for reproducibility
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
@@ -47,7 +52,7 @@ n_train_states, n_cal_states, n_test_states, cal_hist_size, test_hist_size = ds_
 quantiles = np.array([args.alpha/2, 0.5,  1-args.alpha/2]) # LB, MEDIAN, UB
 nb_quantiles = len(quantiles)
 
-idx_str = f'CQR_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
+idx_str = f'QPM_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
 
 print(f"Models folder = Models/{model_name}/ID_{idx_str}")
 print(f"Results folder = Results/{model_name}/ID_{idx_str}")
@@ -79,6 +84,11 @@ qr.initialize()
 qr.load_model(args.n_epochs)
 cqr = CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 
+cc_cqr = CC_CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+
+loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+loc_cqr.get_calibr_scores()
+
 
 # randomly sample an initial state
 state = model.sample_rnd_states(1) #sample an initial state
@@ -90,6 +100,8 @@ running_traj_scaled = -1+2*(running_traj-xmin)/(xmax-xmin)
 running_rob = model.compute_robustness(running_traj_scaled)
 
 list_robs = np.empty((n_steps,nb_trajs_per_state))
+list_cc_cpi = np.empty((n_steps,2))
+list_loc_cpi = np.empty((n_steps,nb_quantiles))
 list_cpi = np.empty((n_steps,nb_quantiles))
 list_pi = np.empty((n_steps,nb_quantiles))
 yq = []
@@ -119,8 +131,13 @@ for t in range(n_steps):
 
 	# apply CQR to each state in the trajectory
 	cpi_test, pi_test = cqr.get_cpi(state_scaled, pi_flag = True)
+	_, cc_cpi_test = cc_cqr.get_cpi(state_scaled)
+	_, loc_cpi_test = loc_cqr.get_cpi(state_scaled)
+	
 	list_cpi[t] = cpi_test
 	list_pi[t] = pi_test
+	list_cc_cpi[t] = cc_cpi_test
+	list_loc_cpi[t] = loc_cpi_test
 
 # analyze the sequential performances
 cov, eff = cqr.get_coverage_efficiency(list_robs.flatten(), list_pi)
@@ -131,9 +148,17 @@ cov, eff = cqr.get_coverage_efficiency(list_robs.flatten(), list_cpi)
 print('cpi sequential coverage = ',cov)
 print('cpi sequential efficiency = ',eff)
 
+cov, eff = cc_cqr.get_coverage_efficiency(list_robs.flatten(), list_cc_cpi)
+print('cc cpi sequential coverage = ',cov)
+print('cc cpi sequential efficiency = ',eff)
+
+cov, eff = loc_cqr.get_coverage_efficiency(list_robs.flatten(), list_loc_cpi)
+print('loc cpi sequential coverage = ',cov)
+print('loc cpi sequential efficiency = ',eff)
+
 xtime = np.arange(n_steps)
 
-y_med = list_cpi[:,1]
+y_med = (list_cpi[:,0]+list_cpi[:,-1])/2
 dminus = y_med-list_cpi[:,0]
 dplus = list_cpi[:,-1]-y_med
 
@@ -141,11 +166,24 @@ y_med_pi = list_pi[:,1]
 dminus_pi = y_med_pi-list_pi[:,0]
 dplus_pi = list_pi[:,-1]-y_med_pi
 
+
+y_med_cc = (list_cc_cpi[:,0]+list_cc_cpi[:,-1])/2
+dminus_cc = y_med_cc-list_cc_cpi[:,0]
+dplus_cc = list_cc_cpi[:,-1]-y_med_cc
+
+y_med_loc = (list_loc_cpi[:,0]+list_loc_cpi[:,-1])/2
+dminus_loc = y_med_loc-list_loc_cpi[:,0]
+dplus_loc = list_loc_cpi[:,-1]-y_med_loc
+
 fig = plt.figure(figsize=(20,4))
 plt.scatter(xline_rep_out, yq_out, c='peachpuff', s=6, alpha = 0.25)
 plt.scatter(xtime_rep, yq,c='orange', s=8, alpha = 0.25, label='seq-test')
-plt.errorbar(x=xtime+0.2, y=y_med_pi, yerr=[dminus_pi,dplus_pi], color = 'c',fmt='o',  capsize = 4, label='QR')
-plt.errorbar(x=xtime+0.4, y=y_med, yerr=[dminus,dplus], color = 'darkviolet',fmt='o',  capsize = 4, label='CQR')
+plt.errorbar(x=xtime+0.1, y=y_med_pi, yerr=[dminus_pi,dplus_pi], color = 'c',fmt='o',  capsize = 4, label='QR')
+plt.errorbar(x=xtime+0.2, y=y_med, yerr=[dminus,dplus], color = 'blue',fmt='none',  capsize = 4, label='CQR')
+plt.errorbar(x=xtime+0.3, y=y_med_cc, yerr=[dminus_cc,dplus_cc], color = 'magenta',fmt='none',  capsize = 4, label='CB-CQR')
+plt.errorbar(x=xtime+0.4, y=y_med, yerr=[dminus,dplus], color = 'darkviolet',fmt='none',  capsize = 4, label='Loc-CQR')
+
+
 plt.plot(xtime[:n_steps], np.zeros(n_steps), '-.',c='k')
 plt.title('sequential evaluation')
 plt.xlabel('time')
