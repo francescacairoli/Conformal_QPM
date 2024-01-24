@@ -45,9 +45,18 @@ class CC_CQR():
 		'''
 		Apply the trained QR to inputs and returns the QR prediction interval
 		'''
-		pis = self.trained_qr_model(Variable(FloatTensor(inputs))).cpu().detach().numpy()
+		if not self.comb_flag:
+			return self.trained_qr_model(Variable(FloatTensor(inputs))).cpu().detach().numpy()
+		else:
+			interval1 = self.trained_qr_model[0](Variable(FloatTensor(inputs))).cpu().detach().numpy() 
+			interval2 = self.trained_qr_model[1](Variable(FloatTensor(inputs))).cpu().detach().numpy() 
+			pis = []
+			for i in range(inputs.shape[0]):
+				# LB = min of the lbs 
+				# UB = min of the ubs
+				pis.append([min(interval1[i][0],interval2[i][0]), min(interval1[i][-1],interval2[i][-1])]) 
 
-		return pis
+			return np.array(pis) 
 
 	def get_calibr_nonconformity_scores(self, y, pred_interval, sorting = True):
 		'''
@@ -83,7 +92,7 @@ class CC_CQR():
 		for i in range(n):
 			for j in range(self.cal_hist_size):
 			
-				if y[c] > 0:
+				if y[c] >= 0:
 					ncm_plus.append(max(pi[i,0]-y[c], y[c]-pi[i,-1]))
 				else:
 					ncm_minus.append(max(pi[i,0]-y[c], y[c]-pi[i,-1]))
@@ -138,11 +147,11 @@ class CC_CQR():
 		n = pi.shape[0]
 		n_quant = pi.shape[1]
 
-		cpi = pi[:,0]-self.tau
-		for j in range(1,n_quant-1):
-			cpi = np.vstack((cpi, pi[:,j]))
-		cpi = np.vstack((cpi, pi[:,-1]+self.tau))
-		
+
+		cpi = np.vstack((pi[:,0],pi[:,-1])).T
+		cpi[:,0] -= self.tau
+		cpi[:,-1] += self.tau
+
 		pos_cpi = np.vstack((pi[:,0],pi[:,-1])).T
 		pos_cpi[:,0] -= self.tau_plus
 		pos_cpi[:,-1] += self.tau_plus
@@ -155,10 +164,10 @@ class CC_CQR():
 		cc_cpi = np.empty((n,2))
 		
 		for i in range(n):
-			if pos_cpi[i,0] >= 0:
+			if pos_cpi[i,0] >= 0 and neg_cpi[i,0] >= 0:
 				cc_cpi[i] = pos_cpi[i]
 				
-			elif neg_cpi[i,-1] < 0:
+			elif neg_cpi[i,-1] <= 0 and pos_cpi[i,-1] < 0:
 				cc_cpi[i] = neg_cpi[i]
 				
 			else: # across zero
@@ -167,11 +176,39 @@ class CC_CQR():
 
 
 		if pi_flag:
-			return cpi.T, cc_cpi, pi
+			return cpi, cc_cpi, pi
 		else:
-			return cpi.T, cc_cpi
+			return cpi, cc_cpi
+
+	def get_cc_cpi(self, inputs, pi_flag = False):
+		'''
+		Returns the conformalized prediction interval (cpi) by enlarging the 
+		QR prediction interval by adding an subtracting tau from the lower and upper bound resp.
+		'''
+		pi = self.get_pred_interval(inputs)
+		self.get_scores_thresholds()
 
 
+		n = pi.shape[0]
+		n_quant = pi.shape[1]
+
+		cpi = np.vstack((pi[:,0],pi[:,-1])).T
+		cpi[:,0] -= self.tau
+		cpi[:,-1] += self.tau
+
+		pos_cpi = np.vstack((pi[:,0],pi[:,-1])).T
+		pos_cpi[:,0] -= self.tau_plus
+		pos_cpi[:,-1] += self.tau_plus
+
+		neg_cpi = np.vstack((pi[:,0],pi[:,-1])).T
+		neg_cpi[:,0] -= self.tau_minus
+		neg_cpi[:,-1] += self.tau_minus
+
+
+		if pi_flag:
+			return cpi, pos_cpi, neg_cpi, pi
+		else:
+			return cpi, pos_cpi, neg_cpi
 		
 
 
@@ -188,7 +225,7 @@ class CC_CQR():
 		for i in range(n_points):
 			c = 0
 			for j in range(self.test_hist_size):
-				if y_test_hist[i,j] >= test_pred_interval[i,0] and y_test_hist[i, j] <= test_pred_interval[i,-1] :
+				if (y_test_hist[i,j] >= test_pred_interval[i,0] and y_test_hist[i, j] <= test_pred_interval[i,-1]):
 					c += 1
 			coverages[i] = c/self.test_hist_size
 
@@ -252,13 +289,14 @@ class CC_CQR():
 		plt.axvline(x=avg_pos_cov,color='mediumblue', linestyle='dashed', label='pos mean')
 		plt.axvline(x=avg_neg_cov, color='firebrick', linestyle='dashed', label='neg mean')
 		
-		plt.xlabel('cb coverage')
+		plt.xlabel('cc coverage')
 		plt.title('cb cpi')
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
 		fig.savefig(plot_path+"/CB_cc_coverage_distribution.png")
 		plt.close()
+
 
 
 	def get_coverage_efficiency(self, y_test, test_pred_interval):
@@ -361,61 +399,7 @@ class CC_CQR():
 		return correct/n_points, uncertain/n_points, wrong/n_points, fp/n_points
 
 
-	def plot_errorbars(self, y, qr_interval, cqr_interval, title_string, plot_path, extra_info = ''):
-		'''
-		Create barplots
-		'''
-		n_points_to_plot = 40
-		
-		n_test_points = len(y)//self.test_hist_size
-		y_resh = np.reshape(y,(n_test_points,self.test_hist_size))
-		y_resh = y_resh[:n_points_to_plot]
-		yq = []
-		yq_out = []
-		xline_rep = []
-		xline_rep_out = []
-		for i in range(n_points_to_plot):
-
-			lower_yi = np.quantile(y_resh[i], self.epsilon/2)
-			upper_yi = np.quantile(y_resh[i], 1-self.epsilon/2)
-			for j in range(self.test_hist_size):
-				if y_resh[i,j] <= upper_yi and y_resh[i,j] >= lower_yi:
-					yq.append(y_resh[i,j])
-					xline_rep.append(i)
-				else:
-					yq_out.append(y_resh[i,j])
-					xline_rep_out.append(i)					
-
-		n_quant = qr_interval.shape[1]
-
-		xline = np.arange(n_points_to_plot)
-		xline1 = np.arange(n_points_to_plot)+0.2
-		xline2 = np.arange(n_points_to_plot)+0.4
-				
-		fig = plt.figure(figsize=(20,4))
-		plt.scatter(xline_rep_out, yq_out, c='peachpuff', s=6, alpha = 0.25)
-		plt.scatter(xline_rep, yq, c='orange', s=6, alpha = 0.25,label='test')
-		
-		plt.plot(xline, np.zeros(n_points_to_plot), '-.', color='k')
-		qr_med = qr_interval[:n_points_to_plot,1]
-		qr_dminus = qr_med-qr_interval[:n_points_to_plot,0]
-		qr_dplus = qr_interval[:n_points_to_plot,-1]-qr_med
-		plt.errorbar(x=xline1, y=qr_med, yerr=[qr_dminus,qr_dplus],  color = 'c', fmt='o', capsize = 4, label='QR')
-		
-		cqr_med = cqr_interval[:n_points_to_plot,1]
-		cqr_dminus = cqr_med-cqr_interval[:n_points_to_plot,0]
-		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-cqr_med
-		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'darkviolet', fmt='o', capsize = 4,label='CQR')
-		
-		plt.ylabel('robustness')
-		plt.title(title_string)
-		plt.legend()
-		plt.grid(True)
-		plt.tight_layout()
-		fig.savefig(plot_path+"/"+extra_info+"_errorbar.png")
-		plt.close()
-
-	def plot_cc_errorbars(self, y, qr_interval, cqr_interval, cc_cqr_interval, title_string, plot_path, extra_info = ''):
+	def plot_errorbars(self, y, qr_interval, cqr_interval, cc_cqr_interval, title_string, plot_path, extra_info = ''):
 		'''
 		Create barplots
 		'''
@@ -452,7 +436,7 @@ class CC_CQR():
 		plt.scatter(xline_rep, yq, c='orange', s=6, alpha = 0.25,label='test')
 		
 		plt.plot(xline, np.zeros(n_points_to_plot), '-.', color='k')
-
+		
 		qr_med = qr_interval[:n_points_to_plot,1]
 		qr_dminus = qr_med-qr_interval[:n_points_to_plot,0]
 		qr_dplus = qr_interval[:n_points_to_plot,-1]-qr_med
@@ -470,6 +454,75 @@ class CC_CQR():
 		plt.errorbar(x=xline3, y=cc_cqr_med, yerr=[cc_cqr_dminus,cc_cqr_dplus],  color = 'darkviolet', fmt='none', capsize = 4,label='CB-CQR')
 		
 
+		plt.ylabel('robustness')
+		plt.title(title_string)
+		plt.legend()
+		plt.grid(True)
+		plt.tight_layout()
+		fig.savefig(plot_path+"/"+extra_info+"_cb_union_errorbar.png")
+		plt.close()
+
+	def plot_cc_errorbars(self, y, qr_interval, cqr_interval, pos_cqr_interval, neg_cqr_interval, title_string, plot_path, extra_info = ''):
+		'''
+		Create barplots
+		'''
+		n_points_to_plot = 40
+		
+		n_test_points = len(y)//self.test_hist_size
+		y_resh = np.reshape(y,(n_test_points,self.test_hist_size))
+		y_resh = y_resh[:n_points_to_plot]
+		yq = []
+		yq_out = []
+		xline_rep = []
+		xline_rep_out = []
+		for i in range(n_points_to_plot):
+
+			lower_yi = np.quantile(y_resh[i], self.epsilon/2)
+			upper_yi = np.quantile(y_resh[i], 1-self.epsilon/2)
+			for j in range(self.test_hist_size):
+				if y_resh[i,j] <= upper_yi and y_resh[i,j] >= lower_yi:
+					yq.append(y_resh[i,j])
+					xline_rep.append(i)
+				else:
+					yq_out.append(y_resh[i,j])
+					xline_rep_out.append(i)					
+
+		n_quant = qr_interval.shape[1]
+
+		xline = np.arange(n_points_to_plot)
+		xline1 = np.arange(n_points_to_plot)+0.15
+		xline2 = np.arange(n_points_to_plot)+0.3
+		xline3 = np.arange(n_points_to_plot)+0.45
+		xline4 = np.arange(n_points_to_plot)+0.5
+				
+		fig = plt.figure(figsize=(20,4))
+		plt.scatter(xline_rep_out, yq_out, c='peachpuff', s=6, alpha = 0.25)
+		plt.scatter(xline_rep, yq, c='orange', s=6, alpha = 0.25,label='test')
+		
+		plt.plot(xline, np.zeros(n_points_to_plot), '-.', color='k')
+
+		qr_med = qr_interval[:n_points_to_plot,1]
+		qr_dminus = qr_med-qr_interval[:n_points_to_plot,0]
+		qr_dplus = qr_interval[:n_points_to_plot,-1]-qr_med
+		plt.errorbar(x=xline1, y=qr_med, yerr=[qr_dminus,qr_dplus],  color = 'c', fmt='o', capsize = 4, label='QR')
+		
+		cqr_med = (cqr_interval[:n_points_to_plot,0]+cqr_interval[:n_points_to_plot,-1])/2
+		cqr_dminus = cqr_med-cqr_interval[:n_points_to_plot,0]
+		cqr_dplus = cqr_interval[:n_points_to_plot,-1]-cqr_med
+		plt.errorbar(x=xline2, y=cqr_med, yerr=[cqr_dminus,cqr_dplus],  color = 'blue', fmt='none', capsize = 4,label='CQR')
+
+		pos_cqr_med = (pos_cqr_interval[:n_points_to_plot,0]+pos_cqr_interval[:n_points_to_plot,-1])/2
+		pos_cqr_dminus = pos_cqr_med-pos_cqr_interval[:n_points_to_plot,0]
+		pos_cqr_dplus = pos_cqr_interval[:n_points_to_plot,-1]-pos_cqr_med
+		
+		plt.errorbar(x=xline3, y=pos_cqr_med, yerr=[pos_cqr_dminus,pos_cqr_dplus],  color = 'cornflowerblue', fmt='none', capsize = 4,label='Pos-CQR')
+		
+		neg_cqr_med = (neg_cqr_interval[:n_points_to_plot,0]+neg_cqr_interval[:n_points_to_plot,-1])/2
+		neg_cqr_dminus = neg_cqr_med-neg_cqr_interval[:n_points_to_plot,0]
+		neg_cqr_dplus = neg_cqr_interval[:n_points_to_plot,-1]-neg_cqr_med
+		
+		plt.errorbar(x=xline4, y=neg_cqr_med, yerr=[neg_cqr_dminus,neg_cqr_dplus],  color = 'lightcoral', fmt='none', capsize = 4,label='Neg-CQR')
+		
 		plt.ylabel('robustness')
 		plt.title(title_string)
 		plt.legend()

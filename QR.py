@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 class QR(nn.Module):
 
 	def __init__(self, input_size = 2, hidden_size = 50, output_size = 2, xavier_flag = False, drop_out_rate = 0.1):
@@ -19,6 +20,7 @@ class QR(nn.Module):
 		self.fc_3 = nn.Linear(hidden_size, hidden_size)
 		self.fc_out = nn.Linear(hidden_size, output_size)
 		
+		self.drop_layer = nn.Dropout(p=self.drop_out_rate)
 		if xavier_flag:
 			nn.init.xavier_normal_(self.fc_in.weight)
 			nn.init.xavier_normal_(self.fc_1.weight)
@@ -29,22 +31,21 @@ class QR(nn.Module):
 
 		
 	def forward(self, x):
-		
 		x = self.fc_in(x)
 		x = nn.LeakyReLU()(x)
-		x = nn.Dropout(p=self.drop_out_rate)(x)
+		x = self.drop_layer(x)
 
 		x = self.fc_1(x)
 		x = nn.LeakyReLU()(x)
-		x = nn.Dropout(p=self.drop_out_rate)(x)
+		x =self.drop_layer(x)
 
 		x = self.fc_2(x)
 		x = nn.LeakyReLU()(x)
-		x = nn.Dropout(p=self.drop_out_rate)(x)
+		x = self.drop_layer(x)
 
 		x = self.fc_3(x)
 		x = nn.LeakyReLU()(x)
-		x = nn.Dropout(p=self.drop_out_rate)(x)
+		x = self.drop_layer(x)
 
 		x = self.fc_out(x)
 

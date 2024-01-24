@@ -4,6 +4,8 @@ import argparse
 import pandas as pd
 from QR import * # NN architecture to learn quantiles
 from CQR import *
+from CB_CQR import * # CC_CQR older version
+from Loc_CQR import *
 from utils import * # import-export methods
 from Dataset import *
 from TrainQR_multiquantile import *
@@ -30,6 +32,9 @@ parser.add_argument("--opt", default="Adam", type=str, help="Optimizer")
 parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out rate")
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
 parser.add_argument("--comb_idx", default=0, type=int, help="Identifier of the combination of properteies to monitor")
+parser.add_argument("--type_localizer", default="gauss", type=str, help="Type of localizer: gauss or knn")
+parser.add_argument("--eps", default=0.1, type=float)
+parser.add_argument("--knn", default=100, type=int)
 args = parser.parse_args()
 print(args)
 
@@ -88,11 +93,29 @@ if args.comb_calibr_flag:
 	cpi_test = cqr.get_cpi(dataset.X_test, pi_flag = False)
 
 
+	cc_cqr = CC_CQR(dataset.X_cal, dataset.R_cal, (qr1.qr_model,qr2.qr_model), test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= True)
+	_, cc_cpi_test = cc_cqr.get_cpi(dataset.X_test)
+
+	loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=(qr1.qr_model,qr2.qr_model), test_hist_size = test_hist_size, cal_hist_size = cal_hist_size,  comb_flag= True)
+	loc_cqr.get_calibr_scores()
+	_, loc_cpi_test = loc_cqr.get_cpi(dataset.X_test)
+
 	cqr.plot_comb_errorbars(dataset.R_test, cpi_test, "predictive intervals", qr1.results_path, extra_info=f'pred_interval_comb{args.comb_idx}_pair={prop_idxs}')
+	
 	cpi_coverage, cpi_efficiency = cqr.get_coverage_efficiency(dataset.R_test, cpi_test)
 	print("cpi_coverage = ", cpi_coverage, "cpi_efficiency = ", cpi_efficiency)
 	cpi_correct, cpi_uncertain, cpi_wrong, cpi_fp = cqr.compute_accuracy_and_uncertainty(cpi_test, dataset.L_test)
 	print("cpi_correct = ", cpi_correct, "cpi_uncertain = ", cpi_uncertain, "cpi_wrong = ", cpi_wrong, "cpi_fp = ", cpi_fp)
+
+	cc_cpi_coverage, cc_cpi_efficiency = cc_cqr.get_coverage_efficiency(dataset.R_test, cc_cpi_test)
+	print("cc_cpi_coverage = ", cc_cpi_coverage, "cc_cpi_efficiency = ", cc_cpi_efficiency)
+	cc_cpi_correct, cc_cpi_uncertain, cc_cpi_wrong, cc_cpi_fp = cc_cqr.compute_accuracy_and_uncertainty(cc_cpi_test, dataset.L_test)
+	print("cc_cpi_correct = ", cc_cpi_correct, "cc_cpi_uncertain = ", cc_cpi_uncertain, "cc_cpi_wrong = ", cc_cpi_wrong, "cc_cpi_fp = ", cc_cpi_fp)
+
+	loc_cpi_coverage, loc_cpi_efficiency = loc_cqr.get_coverage_efficiency(dataset.R_test, loc_cpi_test)
+	print("loc_cpi_coverage = ", loc_cpi_coverage, "loc_cpi_efficiency = ", loc_cpi_efficiency)
+	loc_cpi_correct, loc_cpi_uncertain, loc_cpi_wrong, loc_cpi_fp = loc_cqr.compute_accuracy_and_uncertainty(loc_cpi_test, dataset.L_test)
+	print("loc_cpi_correct = ", loc_cpi_correct, "loc_cpi_uncertain = ", loc_cpi_uncertain, "loc_cpi_wrong = ", loc_cpi_wrong, "loc_cpi_fp = ", loc_cpi_fp)
 
 
 	dataset1 = Dataset(property_idx=prop_idxs[0], comb_flag=False, trainset_fn=trainset_fn, testset_fn=testset_fn, 
@@ -110,25 +133,54 @@ if args.comb_calibr_flag:
 	cqr2 = CQR(dataset2.X_cal, dataset2.R_cal, qr2.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= False)
 	cpi2 = cqr2.get_cpi(dataset2.X_test)
 
+	cc_cqr1 = CC_CQR(dataset1.X_cal, dataset1.R_cal, qr1.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= False)
+	_,cc_cpi1 = cc_cqr1.get_cpi(dataset1.X_test)
+	cc_cqr2 = CC_CQR(dataset2.X_cal, dataset2.R_cal, qr2.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= False)
+	_,cc_cpi2 = cc_cqr2.get_cpi(dataset2.X_test)
+
+	loc_cqr1 = Loc_CQR(dataset1.X_cal, dataset1.R_cal, qr1.qr_model, type_local = args.type_localizer, knn = args.knn, eps=args.eps, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= False)
+	loc_cqr1.get_calibr_scores()
+	_,loc_cpi1 = loc_cqr1.get_cpi(dataset1.X_test)
+	loc_cqr2 = Loc_CQR(dataset2.X_cal, dataset2.R_cal, qr2.qr_model, type_local = args.type_localizer, knn = args.knn, eps=args.eps, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size, comb_flag= False)
+	loc_cqr2.get_calibr_scores()
+	_,loc_cpi2 = loc_cqr2.get_cpi(dataset2.X_test)
+
+	
 	union_coverage, union_efficiency = cqr.get_coverage_efficiency_coupled(dataset.R_test, cpi1, cpi2)
 	print("union_cpi_coverage = ", union_coverage, "union_cpi_efficiency = ", union_efficiency)
 
+	cc_union_coverage, cc_union_efficiency = cc_cqr.get_coverage_efficiency_coupled(dataset.R_test, cc_cpi1, cc_cpi2)
+	print("cc_union_cpi_coverage = ", cc_union_coverage, "cc_union_cpi_efficiency = ", cc_union_efficiency)
+
+	loc_union_coverage, loc_union_efficiency = loc_cqr.get_coverage_efficiency_coupled(dataset.R_test, loc_cpi1, loc_cpi2)
+	print("loc_union_cpi_coverage = ", loc_union_coverage, "loc_nion_cpi_efficiency = ", loc_union_efficiency)
 
 	results_list = ["Id1 = ", idx_str1,"\nId2 = ", idx_str2, "\n", "\n Quantiles = ", str(quantiles),"\n tau = ", str(cqr.tau),
 	"\n",
 	"\n cpi_correct = ", str(cpi_correct), "\n cpi_uncertain = ", str(cpi_uncertain), "\n cpi_wrong = ", str(cpi_wrong), "\n cpi_fp = ", str(cpi_fp),
 	"\n cpi_coverage = ", str(cpi_coverage), "\n cpi_efficiency = ", str(cpi_efficiency),
 	"\n",
-	"\n union_cpi_coverage = ", str(union_coverage), "\n union_cpi_efficiency = ", str(union_efficiency)]
+	"\n cc_cpi_correct = ", str(cc_cpi_correct), "\n cc_cpi_uncertain = ", str(cc_cpi_uncertain), "\n cc_cpi_wrong = ", str(cc_cpi_wrong), "\n cc_cpi_fp = ", str(cc_cpi_fp),
+	"\n cc_cpi_coverage = ", str(cc_cpi_coverage), "\n cc_cpi_efficiency = ", str(cc_cpi_efficiency),
+	"\n",
+	"\n loc_cpi_correct = ", str(loc_cpi_correct), "\n loc_cpi_uncertain = ", str(loc_cpi_uncertain), "\n loc_cpi_wrong = ", str(loc_cpi_wrong), "\n loc_cpi_fp = ", str(loc_cpi_fp),
+	"\n loc_cpi_coverage = ", str(loc_cpi_coverage), "\n loc_cpi_efficiency = ", str(loc_cpi_efficiency),
+	
+	"\n",
+	"\n union_cpi_coverage = ", str(union_coverage), "\n union_cpi_efficiency = ", str(union_efficiency),
+	"\n",
+	"\n cc_union_cpi_coverage = ", str(cc_union_coverage), "\n cc_union_cpi_efficiency = ", str(cc_union_efficiency),
+	"\n",
+	"\n loc_union_cpi_coverage = ", str(loc_union_coverage), "\n loc_union_cpi_efficiency = ", str(loc_union_efficiency)]
 
 	save_results_to_file(results_list, qr1.results_path, extra_info=f'_comb{args.comb_idx}_pair={prop_idxs}')
 	print(qr1.results_path)
 
-	d = {model_name:['MIN', 'UNION'],'correct': [cpi_correct, '-'],
-		'uncertain': [cpi_uncertain, '-'],
-		'wrong':[cpi_wrong, '-'], 'FP':[cpi_fp, '-'],
-		'coverage':[cpi_coverage, union_coverage],
-		'efficiency': [cpi_efficiency,union_efficiency],
+	d = {model_name:['MIN', 'UNION', 'CB-MIN', 'CB-UNION', 'Loc-MIN', 'Loc-UNION',],'correct': [cpi_correct, '-',cc_cpi_correct, '-',loc_cpi_correct, '-'],
+		'uncertain': [cpi_uncertain, '-',cc_cpi_uncertain, '-',loc_cpi_uncertain, '-'],
+		'wrong':[cpi_wrong, '-',cc_cpi_wrong, '-',loc_cpi_wrong, '-'], 'FP':[cpi_fp, '-',cc_cpi_fp, '-',loc_cpi_fp, '-'],
+		'coverage':[cpi_coverage, union_coverage,cc_cpi_coverage, cc_union_coverage,loc_cpi_coverage, loc_union_coverage],
+		'efficiency': [cpi_efficiency,union_efficiency,cc_cpi_efficiency,cc_union_efficiency,loc_cpi_efficiency,loc_union_efficiency],
 		}
 	df = pd.DataFrame(data=d)
 	print('Table of results:\n ',df)
@@ -162,7 +214,13 @@ else: # train the CQR over the combined property
 	cqr12 = CQR(dataset.X_cal, dataset.R_cal, qr12.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 	cpi_test, pi_test = cqr12.get_cpi(dataset.X_test, pi_flag = True)
 
+	cc_cqr12 = CC_CQR(dataset.X_cal, dataset.R_cal, qr12.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+	_, cc_cpi_test = cc_cqr12.get_cpi(dataset.X_test)
+
+	loc_cqr12 = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr12.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+	loc_cqr12.get_calibr_scores()
 	print("shape: ", cpi_test.shape, pi_test.shape)
+	_, loc_cpi_test = loc_cqr12.get_cpi(dataset.X_test)
 
 	pi_coverage, pi_efficiency = cqr12.get_coverage_efficiency(dataset.R_test, pi_test)
 	print("pi_coverage = ", pi_coverage, "pi_efficiency = ", pi_efficiency)
@@ -174,24 +232,44 @@ else: # train the CQR over the combined property
 	cpi_correct, cpi_uncertain, cpi_wrong, cpi_fp = cqr12.compute_accuracy_and_uncertainty(cpi_test, dataset.L_test)
 	print("cpi_correct = ", cpi_correct, "cpi_uncertain = ", cpi_uncertain, "cpi_wrong = ", cpi_wrong, "cpi_fp = ", cpi_fp)
 
+	cc_cpi_coverage, cc_cpi_efficiency = cc_cqr12.get_coverage_efficiency(dataset.R_test, cc_cpi_test)
+	print("cc_cpi_coverage = ", cc_cpi_coverage, "cc_cpi_efficiency = ", cc_cpi_efficiency)
+	cc_cpi_correct, cc_cpi_uncertain, cc_cpi_wrong, cc_cpi_fp = cc_cqr12.compute_accuracy_and_uncertainty(cc_cpi_test, dataset.L_test)
+	print("cc_cpi_correct = ", cc_cpi_correct, "cc_cpi_uncertain = ", cc_cpi_uncertain, "cc_cpi_wrong = ", cc_cpi_wrong, "cc_cpi_fp = ", cc_cpi_fp)
+
+	loc_cpi_coverage, loc_cpi_efficiency = loc_cqr12.get_coverage_efficiency(dataset.R_test, loc_cpi_test)
+	print("loc_cpi_coverage = ", loc_cpi_coverage, "loc_cpi_efficiency = ", loc_cpi_efficiency)
+	loc_cpi_correct, loc_cpi_uncertain, loc_cpi_wrong, loc_cpi_fp = loc_cqr12.compute_accuracy_and_uncertainty(loc_cpi_test, dataset.L_test)
+	print("loc_cpi_correct = ", loc_cpi_correct, "loc_cpi_uncertain = ", loc_cpi_uncertain, "loc_cpi_wrong = ", loc_cpi_wrong, "loc_cpi_fp = ", loc_cpi_fp)
+
+
 	cqr12.plot_errorbars(dataset.R_test, pi_test, cpi_test, "predictive intervals", qr12.results_path, 'pred_interval')
+
+	cc_cqr12.plot_errorbars(dataset.R_test, pi_test, cpi_test, cc_cpi_test, "predictive intervals", qr12.results_path, 'pred_interval')
+	loc_cqr12.plot_loc_errorbars(dataset.R_test, pi_test, cpi_test, loc_cpi_test, "predictive intervals", qr12.results_path, 'pred_interval')
 
 	results_list = ["Id = ", idx_str12, "\n", "\n Quantiles = ", str(quantiles), "\n tau = ", str(cqr12.tau), "\n",
 	"\n pi_correct = ", str(pi_correct), "\n pi_uncertain = ", str(pi_uncertain), "\n pi_wrong = ", str(pi_wrong),"\n pi_fp = ", str(pi_fp),"\n pi_coverage = ", str(pi_coverage), "\n pi_efficiency = ", str(pi_efficiency),
 	"\n",
 	"\n eqr_width = ", str(eqr_width),
 	"\n",
-	"\n cpi_correct = ", str(cpi_correct), "\n cpi_uncertain = ", str(cpi_uncertain), "\n cpi_wrong = ", str(cpi_wrong),"\n cpi_fp = ", str(cpi_fp),"\n cpi_coverage = ", str(cpi_coverage), "\n cpi_efficiency = ", str(cpi_efficiency)]
+	"\n cpi_correct = ", str(cpi_correct), "\n cpi_uncertain = ", str(cpi_uncertain), "\n cpi_wrong = ", str(cpi_wrong),"\n cpi_fp = ", str(cpi_fp),"\n cpi_coverage = ", str(cpi_coverage), "\n cpi_efficiency = ", str(cpi_efficiency),
+	"\n",
+	"\n cc_cpi_coverage = ", str(cc_cpi_coverage), "\n cc_cpi_efficiency = ", str(cc_cpi_efficiency),
+	"\n",
+	"\n loc_cpi_correct = ", str(loc_cpi_correct), "\n loc_cpi_uncertain = ", str(loc_cpi_uncertain), "\n loc_cpi_wrong = ", str(loc_cpi_wrong),"\n loc_cpi_fp = ", str(loc_cpi_fp),"\n loc_cpi_coverage = ", str(loc_cpi_coverage), "\n loc_cpi_efficiency = ", str(loc_cpi_efficiency)
+
+	]
 
 	save_results_to_file(results_list, qr12.results_path)
 	print(qr12.results_path)
 
-	d = {model_name:['QR', 'CQR'],'correct': [pi_correct, cpi_correct],
-		'uncertain': [pi_uncertain, cpi_uncertain],
-		'wrong':[pi_wrong,cpi_wrong], 'FP':[pi_fp,pi_fp],
-		'coverage':[pi_coverage, pi_coverage],
-		'efficiency': [pi_efficiency, cpi_efficiency],
-		'EQR width': [eqr_width, '-']}
+	d = {model_name:['QR', 'CQR','CC_CQR', 'Loc_CQR'],'correct': [pi_correct, cpi_correct, cc_cpi_correct, loc_cpi_correct],
+		'uncertain': [pi_uncertain, cpi_uncertain,  cc_cpi_uncertain, loc_cpi_uncertain],
+		'wrong':[pi_wrong,cpi_wrong,  cc_cpi_wrong, loc_cpi_wrong], 'FP':[pi_fp,pi_fp,  cc_cpi_fp, loc_cpi_fp],
+		'coverage':[pi_coverage, pi_coverage, cc_cpi_coverage, loc_cpi_coverage],
+		'efficiency': [pi_efficiency, cpi_efficiency, cc_cpi_efficiency, loc_cpi_efficiency],
+		'EQR width': [eqr_width, '-', '-', '-']}
 	df = pd.DataFrame(data=d)
 	print('Table of results:\n ',df)
 	out_tables_path = f"out/tables/{args.model_prefix}"

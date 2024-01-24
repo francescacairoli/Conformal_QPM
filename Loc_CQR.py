@@ -50,8 +50,18 @@ class Loc_CQR():
 		Apply the trained QR to inputs and returns the QR prediction interval
 		'''
 		
-		quantiles = self.trained_qr_model(Variable(FloatTensor(inputs))).cpu().detach().numpy()
-		return quantiles
+		if not self.comb_flag:
+			return self.trained_qr_model(Variable(FloatTensor(inputs))).cpu().detach().numpy()
+		else:
+			interval1 = self.trained_qr_model[0](Variable(FloatTensor(inputs))).cpu().detach().numpy() 
+			interval2 = self.trained_qr_model[1](Variable(FloatTensor(inputs))).cpu().detach().numpy() 
+			pis = []
+			for i in range(inputs.shape[0]):
+				# LB = min of the lbs 
+				# UB = min of the ubs
+				pis.append([min(interval1[i][0],interval2[i][0]), min(interval1[i][-1],interval2[i][-1])]) 
+
+			return np.array(pis) 
 		
 
 
