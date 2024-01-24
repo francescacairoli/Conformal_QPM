@@ -27,7 +27,7 @@ parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out ra
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
 parser.add_argument("--property_idx", default=0, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
 parser.add_argument("--seed", default=0, type=int, help='set random seed')
-parser.add_argument("--type_localizer", default="knns", type=str, help="Type of localizer: gauss or knn")
+parser.add_argument("--type_localizer", default="knn", type=str, help="Type of localizer: gauss or knn")
 parser.add_argument("--eps", default=0.1, type=float)
 parser.add_argument("--knn", default=10, type=int)
 args = parser.parse_args()
