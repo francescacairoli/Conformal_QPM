@@ -6,6 +6,7 @@ from QR import * # NN architecture to learn quantiles
 from CQR import *
 from CB_CQR import * # CC_CQR older version
 from Loc_CQR import *
+from Loc_CB_CQR import *
 from utils import * # import-export methods
 from Dataset import *
 from TrainQR_multiquantile import *
@@ -80,6 +81,7 @@ if args.qr_training_flag:
 else:
 	qr.load_model(args.n_epochs)
 
+qr.qr_model.eval()
 
 # Obtain CQR intervals given the trained QR
 cqr = CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
@@ -87,21 +89,29 @@ cpi_test, pi_test = cqr.get_cpi(dataset.X_test, pi_flag = True)
 
 cc_cqr = CC_CQR(dataset.X_cal, dataset.R_cal, qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 _, cc_cpi_test = cc_cqr.get_cpi(dataset.X_test)
-#_, pos_cpi_test, neg_cpi_test = cc_cqr.get_cc_cpi(dataset.X_test)
+_, pos_cpi_test, neg_cpi_test = cc_cqr.get_cc_cpi(dataset.X_test)
 
 loc_cqr = Loc_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
 loc_cqr.get_calibr_scores()
 
 _, loc_cpi_test = loc_cqr.get_cpi(dataset.X_test)
 
+loc_cb_cqr = Loc_CB_CQR(Xc=dataset.X_cal, Yc=dataset.R_cal, type_local = args.type_localizer, knn = args.knn, eps=args.eps, trained_qr_model=qr.qr_model, test_hist_size = test_hist_size, cal_hist_size = cal_hist_size)
+loc_cb_cqr.get_calibr_scores()
+
+_, loc_cb_cpi_test = loc_cb_cqr.get_cpi(dataset.X_test)
+
 _ = cqr.coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
 _ = cqr.cc_coverage_distribution(dataset.R_test, cpi_test, qr.results_path, 1-args.alpha)
 
-_ = cc_cqr.coverage_distribution(dataset.R_test, cc_cpi_test, qr.results_path, 1-args.alpha)
+_ = cc_cqr.coverage_distribution(dataset.R_test,cc_cpi_test, qr.results_path, 1-args.alpha)
 _ = cc_cqr.cc_coverage_distribution(dataset.R_test, cc_cpi_test, qr.results_path, 1-args.alpha)
 
 _ = loc_cqr.coverage_distribution(dataset.R_test, loc_cpi_test, qr.results_path, 1-args.alpha)
 _ = loc_cqr.cc_coverage_distribution(dataset.R_test, loc_cpi_test, qr.results_path, 1-args.alpha)
+
+_ = loc_cb_cqr.coverage_distribution(dataset.R_test, loc_cb_cpi_test, qr.results_path, 1-args.alpha)
+_ = loc_cb_cqr.cc_coverage_distribution(dataset.R_test, loc_cb_cpi_test, qr.results_path, 1-args.alpha)
 
 pi_coverage, pi_efficiency = cqr.get_coverage_efficiency(dataset.R_test, pi_test)
 print("pi_coverage = ", pi_coverage, "pi_efficiency = ", pi_efficiency)
@@ -125,10 +135,13 @@ loc_cpi_correct, loc_cpi_uncertain, loc_cpi_wrong, loc_cpi_fp = loc_cqr.compute_
 print("loc_cpi_correct = ", loc_cpi_correct, "loc_cpi_uncertain = ", loc_cpi_uncertain, "loc_cpi_wrong = ", loc_cpi_wrong, "loc_cpi_fp = ", loc_cpi_fp)
 
 cqr.plot_errorbars(dataset.R_test, pi_test, cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
-cc_cqr.plot_cc_errorbars(dataset.R_test, pi_test, cpi_test, cc_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
+
+cc_cqr.plot_cc_errorbars(dataset.R_test, pi_test, cpi_test, pos_cpi_test, neg_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
+cc_cqr.plot_errorbars(dataset.R_test, pi_test, cpi_test, cc_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
+
 loc_cqr.plot_loc_errorbars(dataset.R_test, pi_test, cpi_test, loc_cpi_test, "predictive intervals", qr.results_path, 'pred_interval')
 
-d = {model_name:['QR', 'CQR', 'CB_CQR', 'Loc_CQR'],'correct': [pi_correct, cpi_correct, cc_cpi_correct, loc_cpi_correct],
+d = {model_name:['QR', 'CQR', 'CC_CQR', 'Loc_CQR'],'correct': [pi_correct, cpi_correct, cc_cpi_correct, loc_cpi_correct],
 	'uncertain': [pi_uncertain, cpi_uncertain,  cc_cpi_uncertain, loc_cpi_uncertain],
 	'wrong':[pi_wrong, cpi_wrong,  cc_cpi_wrong, loc_cpi_wrong], 'FP':[pi_fp, cpi_fp,  cc_cpi_fp, loc_cpi_fp],
 	'coverage':[pi_coverage, cpi_coverage, cc_cpi_coverage, loc_cpi_coverage],
@@ -138,7 +151,7 @@ df = pd.DataFrame(data=d)
 print('Table of results:\n ',df)
 out_tables_path = f"out/tables/{args.model_prefix}"
 os.makedirs(out_tables_path, exist_ok=True)
-df.to_csv(out_tables_path+f"/{model_name}_results.csv", index=False)
+df.to_csv(out_tables_path+f"/{model_name}_#{args.property_idx}_results.csv", index=False)
 
 results_list = ["Id = ", idx_str, "\n", "\n epsilon=", str(args.eps), "\n Quantiles = ", str(quantiles), "\n tau = ", str(cqr.tau), "\n",
 "\n pi_correct = ", str(pi_correct), "\n pi_uncertain = ", str(pi_uncertain), "\n pi_wrong = ", str(pi_wrong),"\n pi_fp = ", str(pi_fp),"\n pi_coverage = ", str(pi_coverage), "\n pi_efficiency = ", str(pi_efficiency),
@@ -147,7 +160,7 @@ results_list = ["Id = ", idx_str, "\n", "\n epsilon=", str(args.eps), "\n Quanti
 "\n",
 "\n cpi_correct = ", str(cpi_correct), "\n cpi_uncertain = ", str(cpi_uncertain), "\n cpi_wrong = ", str(cpi_wrong),"\n cpi_fp = ", str(cpi_fp),"\n cpi_coverage = ", str(cpi_coverage), "\n cpi_efficiency = ", str(cpi_efficiency),
 "\n",
-"\n cc_cpi_correct = ", str(cc_cpi_correct), "\n cc_cpi_uncertain = ", str(cc_cpi_uncertain), "\n cc_cpi_wrong = ", str(cc_cpi_wrong),"\n cc_cpi_fp = ", str(cc_cpi_fp),
+#"\n cc_cpi_correct = ", str(cc_cpi_correct), "\n cc_cpi_uncertain = ", str(cc_cpi_uncertain), "\n cc_cpi_wrong = ", str(cc_cpi_wrong),"\n cc_cpi_fp = ", str(cc_cpi_fp),
 "\n cc_cpi_coverage = ", str(cc_cpi_coverage), "\n cc_cpi_efficiency = ", str(cc_cpi_efficiency),
 "\n",
 "\n loc_cpi_correct = ", str(loc_cpi_correct), "\n loc_cpi_uncertain = ", str(loc_cpi_uncertain), "\n loc_cpi_wrong = ", str(loc_cpi_wrong),"\n loc_cpi_fp = ", str(loc_cpi_fp),"\n loc_cpi_coverage = ", str(loc_cpi_coverage), "\n loc_cpi_efficiency = ", str(loc_cpi_efficiency)

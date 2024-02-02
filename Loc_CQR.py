@@ -269,8 +269,8 @@ class Loc_CQR():
 		'''
 		n_points = len(y_test)//self.test_hist_size
 		y_test_hist = np.reshape(y_test, (n_points, self.test_hist_size))
-		pos_coverages = np.zeros(n_points)
-		neg_coverages = np.zeros(n_points)
+		pos_coverages = []#np.zeros(n_points)
+		neg_coverages = []#np.zeros(n_points)
 		
 		for i in range(n_points):
 			c_pos, c_neg = 0, 0
@@ -285,15 +285,14 @@ class Loc_CQR():
 						c_pos += 1
 					else:
 						c_neg += 1
-			if tot_pos == 0:
-				pos_coverages[i] = 1
-			else:
-				pos_coverages[i] = c_pos/tot_pos
-			if tot_neg == 0:
-				neg_coverages[i] = 1
-			else:
-				neg_coverages[i] = c_neg/tot_neg
+			if tot_pos > 0:
+				pos_coverages.append(c_pos/tot_pos)
+			if tot_neg > 0:
+				neg_coverages.append(c_neg/tot_neg)
 
+		pos_coverages = np.array(pos_coverages)
+		neg_coverages = np.array(neg_coverages)
+		
 		avg_pos_cov = np.mean(pos_coverages)
 		avg_neg_cov = np.mean(neg_coverages)
 		fig = plt.figure()
@@ -310,9 +309,9 @@ class Loc_CQR():
 		plt.legend()
 		plt.tight_layout()
 		if self.type_local == 'gauss':
-			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_eps={self.eps}.png")
+			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_eps={self.eps}_fix.png")
 		elif self.type_local == 'knn':
-			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_k={self.knn}.png")
+			fig.savefig(plot_path+f"/loc_{self.type_local}_cc_coverage_distribution_k={self.knn}_fix.png")
 		else:
 			print('warning: unrecognized localizer type!')
 		plt.close()
