@@ -5,7 +5,7 @@ import pandas as pd
 from QR import * # NN architecture to learn quantiles
 from CQR import *
 from CB_CQR import * # CC_CQR older version
-from Loc_CQR import *
+from ReLoc_CQR import *
 from Loc_CB_CQR import *
 from utils import * # import-export methods
 from Dataset import *
@@ -17,20 +17,20 @@ np.random.seed(0)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dim", default=2, type=int, help="Dimension of the model")
-parser.add_argument("--model_prefix", default="AADF", type=str, help="Prefix of the model name")
+parser.add_argument("--model_prefix", default="MRH", type=str, help="Prefix of the model name")
 parser.add_argument("--n_epochs", default=500, type=int, help="Nb of training epochs for QR")
 parser.add_argument("--n_hidden", default=20, type=int, help="Nb of hidden nodes per layer")
 parser.add_argument("--batch_size", default=512, type=int, help="Batch size")
 parser.add_argument("--lr", default=0.0005, type=float, help="Learning rate")
-parser.add_argument("--qr_training_flag", default=True, type=eval, help="training flag")
+parser.add_argument("--qr_training_flag", default=False, type=eval, help="training flag")
 parser.add_argument("--xavier_flag", default=False, type=eval, help="Xavier random weights initialization")
 parser.add_argument("--scheduler_flag", default=False, type=eval, help="scheduler flag")
 parser.add_argument("--opt", default="Adam", type=str, help="Optimizer")
 parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out rate")
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
-parser.add_argument("--property_idx", default=-1, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
+parser.add_argument("--property_idx", default=0, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
 parser.add_argument("--type_localizer", default="knn", type=str, help="Type of localizer: gauss or knn")
-parser.add_argument("--eps", default=0.1, type=float)
+parser.add_argument("--eps", default=1, type=float)
 parser.add_argument("--knn", default=10, type=int)
 args = parser.parse_args()
 print(args)
