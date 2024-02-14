@@ -6,7 +6,7 @@ from QR import * # NN architecture to learn quantiles
 from CQR import *
 from CB_CQR import * # CC_CQR older version
 from ReLoc_CQR import *
-from Loc_CB_CQR import *
+from ReLoc_CB_CQR import *
 from utils import * # import-export methods
 from Dataset import *
 from TrainQR_multiquantile import *
@@ -30,8 +30,9 @@ parser.add_argument("--dropout_rate", default=0.1, type=float, help="Drop-out ra
 parser.add_argument("--alpha", default=0.1, type=float, help="quantiles significance level")
 parser.add_argument("--property_idx", default=0, type=int, help="Identifier of the property to monitor (-1 denotes that the property is wrt all variables)")
 parser.add_argument("--type_localizer", default="knn", type=str, help="Type of localizer: gauss or knn")
-parser.add_argument("--eps", default=1, type=float)
+parser.add_argument("--eps", default=0.1, type=float)
 parser.add_argument("--knn", default=10, type=int)
+parser.add_argument("--rob_type", default='space', type=str)
 args = parser.parse_args()
 print(args)
 
@@ -48,8 +49,10 @@ n_train_states, n_cal_states, n_test_states, cal_hist_size, test_hist_size = ds_
 quantiles = np.array([args.alpha/2, 0.5,  1-args.alpha/2]) # LB, MEDIAN, UB
 nb_quantiles = len(quantiles)
 
-idx_str = f'QPM_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
-
+if args.rob_type == 'space':
+	idx_str = f'QPM_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}'
+else:
+	idx_str = f'QPM_#{args.property_idx}_Dropout{args.dropout_rate}_multiout_opt=_{args.n_hidden}hidden_{args.n_epochs}epochs_{nb_quantiles}quantiles_3layers_alpha{args.alpha}_lr{args.lr}_{args.rob_type}_rob'
 
 print(f"Models folder = Models/{model_name}/ID_{idx_str}")
 print(f"Results folder = Results/{model_name}/ID_{idx_str}")
@@ -63,7 +66,7 @@ print(f"Training settings: n_epochs = {args.n_epochs}, lr = {args.lr}, batch_siz
 # import data
 dataset = Dataset(property_idx=args.property_idx, comb_flag=False, trainset_fn=trainset_fn, testset_fn=testset_fn, 
 			calibrset_fn=calibrset_fn, alpha=args.alpha, n_train_states=n_train_states, n_cal_states=n_cal_states, 
-			n_test_states=n_test_states, hist_size=cal_hist_size, test_hist_size=test_hist_size)
+			n_test_states=n_test_states, hist_size=cal_hist_size, test_hist_size=test_hist_size, rob_type=args.rob_type)
 eqr_width = dataset.load_data()
 
 print(f"Test EQR width = {eqr_width}")
