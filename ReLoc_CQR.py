@@ -31,8 +31,8 @@ class Loc_CQR():
 
 		self.Yc = Yc
 		self.Xc = Xc
-		self.alpha = 1-eps
-		self.grid_alphas = np.linspace(self.alpha, 1, 101)
+		
+		
 		self.type_local = type_local # {'gauss', 'knn'}
 		self.eps = eps # variance of the gaussian localizers
 		self.knn = knn # nb of neighbors in the knn localizer
@@ -43,6 +43,8 @@ class Loc_CQR():
 		self.cal_hist_size = cal_hist_size
 		self.quantiles = quantiles
 		self.epsilon = 2*quantiles[0]
+		self.alpha = 1-self.epsilon
+		self.grid_alphas = np.linspace(self.alpha, 1, 101)
 		self.Q = (1-self.epsilon)*(1+1/(self.q+1))
 
 
