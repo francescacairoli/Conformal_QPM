@@ -6,7 +6,7 @@ class Dataset():
 	'''
 	Class containing all the data pre-processing steps for the train, calibration and test data and to create mini-batches of training data
 	'''
-	def __init__(self, property_idx, comb_flag, trainset_fn, testset_fn, calibrset_fn, alpha = 0.1, n_train_states = 2000, n_cal_states = 1000, n_test_states = 100, hist_size = 50, test_hist_size = 2000, multiplier = 1):
+	def __init__(self, property_idx, comb_flag, trainset_fn, testset_fn, calibrset_fn, alpha = 0.1, n_train_states = 2000, n_cal_states = 1000, n_test_states = 100, hist_size = 50, test_hist_size = 2000, multiplier = 1, rob_type = 'space'):
 		super(Dataset, self).__init__()
 
 		self.trainset_fn = trainset_fn
@@ -21,6 +21,7 @@ class Dataset():
 		self.multiplier = multiplier
 		self.property_idx = property_idx
 		self.comb_flag = comb_flag
+		self.rob_type = rob_type
 		
 	def load_data(self):
 		
@@ -39,7 +40,10 @@ class Dataset():
 		self.X_train = data["x_scaled"]
 		
 		if self.property_idx == -1: #-1 denotes the property wrt all variables
-			self.R_train = self.multiplier*data["rob"]
+			if self.rob_type == 'space':
+				self.R_train = self.multiplier*data["rob"]
+			else:
+				self.R_train = self.multiplier*data["time_rob"]
 		else:
 			if self.comb_flag:
 				self.R_train = self.multiplier*data["couple_robs"][self.property_idx]
@@ -80,7 +84,11 @@ class Dataset():
 		self.X_test = data["x_scaled"]
 
 		if self.property_idx == -1: #-1 denotes the property wrt all variables
-			self.R_test = self.multiplier*data["rob"]
+			if self.rob_type == 'space':
+				self.R_test = self.multiplier*data["rob"]
+			else:
+				self.R_test = self.multiplier*data["time_rob"]
+
 		else:
 			if self.comb_flag:
 				self.R_test = self.multiplier*data["couple_robs"][self.property_idx]
@@ -123,7 +131,10 @@ class Dataset():
 		self.X_cal = data["x_scaled"]
 		
 		if self.property_idx == -1: #-1 denotes the property wrt all variables
-			self.R_cal = self.multiplier*data["rob"]
+			if self.rob_type == 'space':
+				self.R_cal = self.multiplier*data["rob"]
+			else:
+				self.R_cal = self.multiplier*data["time_rob"]
 		else:
 			if self.comb_flag:
 				self.R_cal = self.multiplier*data["couple_robs"][self.property_idx]

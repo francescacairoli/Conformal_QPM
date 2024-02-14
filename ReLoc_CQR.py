@@ -54,18 +54,6 @@ class Loc_CQR():
 		self.comb_flag = comb_flag # default: False
 		self.plots_path = plots_path
 
-	'''
-	def weighted_quantile(self, data, perc, weights):
-	    """
-	    perc : percentile in [0-1]!
-	    """
-	    ix = np.argsort(data)
-	    data = data[ix] # sort data
-	    weights = weights[ix] # sort weights
-	    cdf = (np.cumsum(weights) - 0.5 * weights) / np.sum(weights) # 'like' a CDF function
-	    return np.interp(perc, cdf, data)
-
-	'''
 	def weighted_quantile(self, values, quantiles, weights=None, values_sorted=False):
 	    values = np.array(values)
 	    quantiles = np.array(quantiles)
@@ -232,11 +220,11 @@ class Loc_CQR():
 
 		V0 = np.hstack((self.V, [0]))
 
-		print("=== x star = ", x_star)
+		#print("=== x star = ", x_star)
 		for alpha_tilde in self.grid_alphas:
 			
 			v_star =  self.weighted_quantile(self.calibr_scores, alpha_tilde, weights = Pstar[-1])
-			print("alpha tilde = ", alpha_tilde, "v_star = ", v_star)
+			#print("alpha tilde = ", alpha_tilde, "v_star = ", v_star)
 			v1_star = np.empty(self.q)
 			v2_star = np.empty(self.q)
 			for i in range(self.n):
@@ -250,10 +238,10 @@ class Loc_CQR():
 			r1 = np.sum(((self.V-v1_star)<=0))/(self.q+1)
 			r2 = np.sum(((self.V-v2_star)<=0))/(self.q+1)
 
-			print("rs = ", r1, r2)
+			#print("rs = ", r1, r2)
 			
 			if v_star == math.inf or (r1 >= self.alpha and r2 >= self.alpha):
-				print("----> alpha tilde = ", alpha_tilde, "tau_j = ", v_star)
+				#print("----> alpha tilde = ", alpha_tilde, "tau_j = ", v_star)
 				return v_star
 
 

@@ -182,86 +182,7 @@ class Loc_CB_CQR():
 		return ratio[0]
 
 
-	def get_weighted_quantile(self, cal_weights):
-
-		hval, hbin = np.histogram(self.calibr_scores, bins=100*self.q, weights=cal_weights)
-
-		cs = np.cumsum(hval)
-		rhbin = hbin[1:]
-		taus = rhbin[(cs>self.Q)]
-		return taus[0]
-
-	def get_cc_weighted_quantile(self, pos_cal_weights, neg_cal_weights):
-
-		#print(pos_cal_weights.shape, neg_cal_weights.shape)
-		
-		#print('cal scores: ', len(self.calibr_scores_plus),len(self.calibr_scores_minus))
-		hvalp, hbinp = np.histogram(self.calibr_scores_plus, bins=100*self.q, weights=pos_cal_weights)
-		hvalm, hbinm = np.histogram(self.calibr_scores_minus, bins=100*self.q, weights=neg_cal_weights)
-
-		csp = np.cumsum(hvalp)
-		rhbinp = hbinp[1:]
-		taus_p = rhbinp[(csp>self.Qp)]
-		
-		csm = np.cumsum(hvalm)
-		rhbinm = hbinm[1:]
-		taus_m = rhbinm[(csm>self.Qm)]
-
-		if len(taus_p) > 0:
-			taus_p = taus_p[0]
-		else:
-			taus_p = math.inf
-		if len(taus_m) > 0:
-			taus_m = taus_m[0]
-		else:
-			taus_m = math.inf
-		#print('self.Qp, self.Qm = ', self.Qp, self.Qm)
-		#print('taus_p.shape, taus_m.shape=',taus_p.shape, taus_m.shape)
-		return taus_p,taus_m
-
-	def get_calibr_weights(self, x_star):
-		n = len(self.Xc)
-		m = n*self.cal_hist_size
-		if self.type_local == 'gauss':
-			#r = np.empty(n)
-			pw = []
-			nw = []
-			cc = 0
-			for ii in range(n):
-				
-				r = self.compute_gauss_likelihood(x_star, self.Xc[ii])
-				for _ in range(self.cal_hist_size):
-					if self.Yc[cc] >= 0:
-						pw.append(r)
-					else:
-						nw.append(r)
-					cc += 1
-			#r_rep = np.repeat(r, self.cal_hist_size)
-			pweights = np.array(pw/np.sum(pw))
-			nweights = np.array(nw/np.sum(nw))
-		elif self.type_local == 'knn':
-			diff = x_star-self.Xc
-			dists = np.array([np.linalg.norm(diff[i]) for i in range(n)])
-			sort_index = np.argsort(dists) # increasing sorting
-			r = np.zeros(n)
-			r[sort_index[:self.knn]] = 1
-			pw = []
-			nw = []
-			cc = 0
-			for ii in range(n):
-				for _ in range(self.cal_hist_size):
-					if self.Yc[cc] >= 0:
-						pw.append(r[ii])
-					else:
-						nw.append(r[ii])
-					cc += 1
-			pweights = np.array(pw/np.sum(pw))
-			nweights = np.array(nw/np.sum(nw))
-		else:
-			print(' Warning: unrecongnized localization type')
-			weights = np.ones(m)/m
-
-		return pweights, nweights
+	
 
 	def compute_H_matrix(self):
 
@@ -340,13 +261,13 @@ class Loc_CB_CQR():
 		Vp0 = np.hstack((self.Vp, [0]))
 		Vm0 = np.hstack((self.Vm, [0]))
 
-		print("=== x star = ", x_star)
+		#print("=== x star = ", x_star)
 		for alpha_tilde in self.grid_alphas:
 			
 			v_star_p =  self.weighted_quantile(self.calibr_scores_plus, alpha_tilde, weights = Pstar_p[-1])
 			v_star_m =  self.weighted_quantile(self.calibr_scores_minus, alpha_tilde, weights = Pstar_m[-1])
 			
-			print("alpha tilde = ", alpha_tilde, "v_star = ", v_star_p, v_star_m)
+			#print("alpha tilde = ", alpha_tilde, "v_star = ", v_star_p, v_star_m)
 			v1p_star = np.empty(len(self.Vp))
 			v2p_star = np.empty(len(self.Vp))
 			v1m_star = np.empty(len(self.Vm))
@@ -376,12 +297,12 @@ class Loc_CB_CQR():
 			r1_m = np.sum(((self.Vm-v1m_star)<=0))/(len(self.Vm)+1)
 			r2_m = np.sum(((self.Vm-v2m_star)<=0))/(len(self.Vm)+1)
 
-			print("rp = ", r1_p, r2_p)
-			print("rm = ", r1_m, r2_m)
+			#print("rp = ", r1_p, r2_p)
+			#print("rm = ", r1_m, r2_m)
 			
 			if (v_star_p == math.inf) or (r1_p >= self.alpha and r2_p >= self.alpha):
 				if (v_star_m == math.inf) or (r1_m >= self.alpha and r2_m >= self.alpha):
-					print("----> alpha tilde = ", alpha_tilde, "taup_j = ", v_star_p, v_star_m)
+					#print("----> alpha tilde = ", alpha_tilde, "taup_j = ", v_star_p, v_star_m)
 					return v_star_p, v_star_m
 
 
@@ -477,9 +398,9 @@ class Loc_CB_CQR():
 		plt.legend()
 		plt.tight_layout()
 		if self.type_local == 'gauss':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_marginal_coverage_distribution_eps={self.eps}.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_marginal_coverage_distribution_eps={self.eps}.png")
 		elif self.type_local == 'knn':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_marginal_coverage_distribution_k={self.knn}.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_marginal_coverage_distribution_k={self.knn}.png")
 		plt.close()
 	
 		return coverages
@@ -531,9 +452,9 @@ class Loc_CB_CQR():
 		plt.legend()
 		plt.tight_layout()
 		if self.type_local == 'gauss':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_cc_coverage_distribution_eps={self.eps}_fix.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_cc_coverage_distribution_eps={self.eps}_fix.png")
 		elif self.type_local == 'knn':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_cc_coverage_distribution_k={self.knn}_fix.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_cc_coverage_distribution_k={self.knn}_fix.png")
 		else:
 			print('warning: unrecognized localizer type!')
 		plt.close()
@@ -682,9 +603,9 @@ class Loc_CB_CQR():
 		plt.grid(True)
 		plt.tight_layout()
 		if self.type_local == 'gauss':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_"+extra_info+f"_errorbar_eps={self.eps}.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_"+extra_info+f"_errorbar_eps={self.eps}.png")
 		elif self.type_local == 'knn':
-			fig.savefig(plot_path+f"/CBLoc_{self.type_local}_"+extra_info+f"_errorbar_k={self.knn}.png")
+			fig.savefig(plot_path+f"/CBReLoc_{self.type_local}_"+extra_info+f"_errorbar_k={self.knn}.png")
 		else:
 			print('warning: unrecognized localizer type!')
 		plt.close()
