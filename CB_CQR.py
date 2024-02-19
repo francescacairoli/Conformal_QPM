@@ -65,7 +65,7 @@ class CC_CQR():
 		'''
 		n = pred_interval.shape[0] # number of states
 		m = len(y)  # m = n x self.cal_hist_size
-		ncm = np.empty(m)
+		ncm = np.empty(m+1)
 
 		c = 0		
 		for i in range(n):
@@ -73,6 +73,8 @@ class CC_CQR():
 			
 				ncm[c] = max(pred_interval[i,0]-y[c], y[c]-pred_interval[i,-1]) # pred_interval[i,0] = q_lo(x), pred_interval[i,1] = q_hi(x)
 				c += 1	
+		ncm[-1] = math.inf
+
 		if sorting:
 			ncm = np.sort(ncm)[::-1] # descending order
 		return ncm
@@ -96,7 +98,10 @@ class CC_CQR():
 					ncm_plus.append(max(pi[i,0]-y[c], y[c]-pi[i,-1]))
 				else:
 					ncm_minus.append(max(pi[i,0]-y[c], y[c]-pi[i,-1]))
-				c += 1	
+				c += 1
+		ncm_plus.append(math.inf)
+		ncm_minus.append(math.inf)
+
 		ncm_plus = np.array(ncm_plus)
 		ncm_minus = np.array(ncm_minus)
 
@@ -124,7 +129,7 @@ class CC_CQR():
 		print("Nb of POSITIVE calibr scores = ", len(self.calibr_scores_plus))
 		print("Nb of NEGATIVE calibr scores = ", len(self.calibr_scores_minus))
 
-		Q = (1-self.epsilon)*(1+1/self.q)
+		Q = (1-self.epsilon)*(1+1/len(self.calibr_scores))
 		if len(self.calibr_scores_plus) > 0:
 			Qp = min((1-self.epsilon)*(1+1/len(self.calibr_scores_plus)),1)
 			self.tau_plus = np.quantile(self.calibr_scores_plus, Qp)
@@ -199,7 +204,6 @@ class CC_CQR():
 
 
 		n = pi.shape[0]
-		n_quant = pi.shape[1]
 
 		cpi = np.vstack((pi[:,0],pi[:,-1])).T
 		cpi[:,0] -= self.tau
@@ -241,7 +245,7 @@ class CC_CQR():
 		avg_cov = np.mean(coverages)
 		
 		fig = plt.figure()
-		plt.hist(coverages, bins = nbins, stacked=False, density=False, color='lightsteelblue')
+		plt.hist(coverages, bins = nbins, stacked=False, density=False, color='lightsteelblue',range=[0,1])
 		plt.axvline(x=target_cov,color='k', linestyle='dashed', label=r'$1-\alpha$')
 		plt.axvline(x=avg_cov,color='steelblue', linestyle='dashed', label='mean')
 		
@@ -290,8 +294,8 @@ class CC_CQR():
 		avg_pos_cov = np.mean(pos_coverages)
 		avg_neg_cov = np.mean(neg_coverages)
 		fig = plt.figure()
-		plt.hist(pos_coverages, bins = nbins, stacked=False, density=False, color='cornflowerblue', label='pos')
-		plt.hist(neg_coverages, bins = nbins, stacked=False, density=False, color='lightcoral', label='neg')
+		plt.hist(pos_coverages, bins = nbins, stacked=False, density=False, color='cornflowerblue', label='pos',range=[0,1])
+		plt.hist(neg_coverages, bins = nbins, stacked=False, density=False, color='lightcoral', label='neg',range=[0,1])
 		
 		plt.axvline(x=target_cov,color='k', linestyle='dashed', label=r'$1-\alpha$')
 		plt.axvline(x=avg_pos_cov,color='mediumblue', linestyle='dashed', label='pos mean')

@@ -1,5 +1,6 @@
 import copy
 import torch
+import math
 import numpy as np
 import scipy.special
 import scipy.spatial
@@ -65,7 +66,7 @@ class CQR():
 		'''
 		n = pred_interval.shape[0]
 		m = len(y)
-		ncm = np.empty(m)
+		ncm = np.empty(m+1)
 
 		c = 0		
 		for i in range(n):
@@ -73,6 +74,7 @@ class CQR():
 			
 				ncm[c] = max(pred_interval[i,0]-y[c], y[c]-pred_interval[i,-1]) # pred_interval[i,0] = q_lo(x), pred_interval[i,1] = q_hi(x)
 				c += 1	
+		ncm[-1] = math.inf
 		if sorting:
 			ncm = np.sort(ncm)[::-1] # descending order
 		return ncm
@@ -88,7 +90,7 @@ class CQR():
 		# nonconformity scores on the calibration set
 		self.calibr_scores = self.get_calibr_nonconformity_scores(self.Yc, self.calibr_pred)
 
-		Q = (1-self.epsilon)*(1+1/self.q)
+		Q = (1-self.epsilon)*(1+1/len(self.calibr_scores))
 		self.tau = np.quantile(self.calibr_scores, Q)
 
 		print("self.tau: ", self.tau)
@@ -149,7 +151,7 @@ class CQR():
 		avg_cov = np.mean(coverages)
 
 		fig = plt.figure()
-		plt.hist(coverages, bins = 50, stacked=False, density=True, color='lightsteelblue')
+		plt.hist(coverages, bins = 50, stacked=False, density=True, color='lightsteelblue',range=[0,1])
 		plt.axvline(x=target_cov, color='k', linestyle='dashed', label=r'$1-\alpha$')
 		plt.axvline(x=avg_cov, color='steelblue', linestyle='dashed', label='mean')
 		
@@ -196,8 +198,8 @@ class CQR():
 		avg_pos_cov = np.mean(pos_coverages)
 		avg_neg_cov = np.mean(neg_coverages)
 		fig = plt.figure()
-		plt.hist(pos_coverages, bins = 50, stacked=False, density=True, color='cornflowerblue', label='pos')
-		plt.hist(neg_coverages, bins = 50, stacked=False, density=True, color='lightcoral', label='neg')
+		plt.hist(pos_coverages, bins = 50, stacked=False, density=True, color='cornflowerblue', label='pos',range=[0,1])
+		plt.hist(neg_coverages, bins = 50, stacked=False, density=True, color='lightcoral', label='neg',range=[0,1])
 		
 		plt.axvline(x=target_cov, color='k', linestyle='dashed', label=r'$1-\alpha$')
 		plt.axvline(x=avg_pos_cov, color='mediumblue', linestyle='dashed', label='pos mean')
