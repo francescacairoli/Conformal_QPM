@@ -1,0 +1,65 @@
+global:
+  device: 'cuda'
+
+
+data:
+  n_states: 3000
+  n_suffixes: 200
+  prefix_len: 1
+  suffix_len: 20
+
+
+debug:
+  debug: True
+  debug_level: 3
+
+
+env:
+  n_agents: 2
+  n_adversaries: 1
+  n_landmarks: 2
+  load_policies: True
+
+
+path:
+  root: '' # Replace this path first to the folder in which you wish all output to be stored
+  env_name: 'mpe_agt_2'
+  dataset_name: 'train_cal'
+
+
+rand:
+  default_seed: 22
+  sim:
+    noise_seed: 22
+    noisy: False
+    noise_var: 0.01
+    noise_func: 'normal'
+
+    world_seed: 22
+    world_func: 'uniform'
+
+
+sim:
+  buffer_size: 90000
+#  render_mode: 'human'
+
+  generator:
+    parallel: True
+    n_threads: 100
+
+  policy:
+    eps_test: 0.1
+    eps_train: 0.1
+    lr: 1e-04
+    gamma: 0.95
+    n_step: 2
+    target_update_freq: 320
+    epoch: 20
+    step_per_epoch: 6000
+    step_per_collect: 60
+    update_per_step: 0.1
+    batch_size: 240
+    # hidden_sizes: None
+    training_num: 1
+    test_num: 1
+    render: 0.25
